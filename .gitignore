@@ -7,3 +7,4 @@ scratch
 output/*
 src/cleverhans
 src/pip-delete-this-directory.txt
+nohup.out

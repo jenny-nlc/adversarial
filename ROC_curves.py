@@ -15,8 +15,8 @@ from src.utilities import *
 
 
 
-eps = np.linspace(0.1,1,3) #some random values of epsilon
-SYNTH_DATA_SIZE = 20 #actually twice this but whatever# %%
+eps = np.linspace(0.1,1,10) #some random values of epsilon
+SYNTH_DATA_SIZE = 2000 #actually twice this but whatever# %%
 
 
 

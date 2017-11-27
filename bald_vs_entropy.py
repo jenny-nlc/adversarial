@@ -81,5 +81,3 @@ def mk_plot(value, name):
 for v, n in zip(to_plot, names):
     mk_plot(v, n)
 
-#TODO: plot the ROC curve for the entropy and BALD on some kind of
-#synthesised dataset.
