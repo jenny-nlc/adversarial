@@ -64,7 +64,6 @@ for ep in eps:
     accs.append(  np.array(b_accs).mean())          #ditto
 
 
-#TODO: add some boilerplate to save the examples then throw this at the server
 to_plot = [entropies, balds, accs]
 names = ['Entropy', 'BALD', 'Accuracy']
 
