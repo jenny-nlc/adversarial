@@ -1,0 +1,9 @@
+__pycache__/*
+.git/*
+.DS_Store
+scratch
+*.pyc
+*.png
+output/*
+src/cleverhans
+src/pip-delete-this-directory.txt
