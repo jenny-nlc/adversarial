@@ -1,6 +1,8 @@
 import tensorflow as tf
 import keras
 import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 from matplotlib import pyplot as plt
 from keras.models import load_model, save_model
 from keras import backend as K
@@ -12,8 +14,7 @@ from src.utilities import *
 # %%
 x_test, y_test, x_train, y_train = get_mnist()
 
-# %%
-#below here is just scripting and messing around
+
 K.set_learning_phase(True)
 #load the pre-trained model (trained by another file)
 model = load_model('mnist_cnn.h5')
@@ -42,7 +43,7 @@ balds = []
 accs = []
 eps = np.linspace(0,.5, 50)
 preds_tensor = K.mean(mc_preds_tensor, axis = 0)
-
+a
 
 for ep in eps:
     adv_tensor = fgsm(x, preds_tensor, eps = ep, clip_min = 0, clip_max = 1)

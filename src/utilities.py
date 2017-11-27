@@ -1,12 +1,10 @@
 import tensorflow as tf
 import keras
 import numpy as np
-from matplotlib import pyplot as plt
-from keras.models import load_model, save_model
+
 from keras import backend as K
 from keras.datasets import mnist
 import itertools as itr
-from cleverhans.attacks_tf import fgsm
 
 # %%
 
