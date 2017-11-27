@@ -15,8 +15,8 @@ from src.utilities import *
 
 
 
-eps = np.linspace(0.1,1,10) #some random values of epsilon
-SYNTH_DATA_SIZE = 2000 #actually twice this but whatever# %%
+eps = np.linspace(0.1,1,3) #some random values of epsilon
+SYNTH_DATA_SIZE = 10 #actually twice this but whatever# %%
 
 
 
@@ -43,27 +43,35 @@ preds_tensor = K.mean(mc_preds_tensor, axis = 0)
 
 #create a synthetic training set at various epsilons, and evaluate the ROC curves on it
 
+x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+x_to_adv = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+
+x_advs_plot = [tile_images([x_to_adv[i] for i in range(10)], horizontal = False) ]
+
+x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)] #label zero for non adverserial input
+x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
 
 for ep in eps:
     adv_tensor = fgsm(x, preds_tensor, eps = ep, clip_min = 0, clip_max = 1)
 
     #choose a random sample from the test set
-    x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
-    x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)] #label zero for non adverserial input
 
-    x_to_adv = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+
     x_adv = adv_tensor.eval(session = K.get_session(),
                             feed_dict = {x: x_to_adv})
-    x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
+
 
     #we now have some random samples of real and adverserial data.
     #shuffle them up
 
     x_synth = np.concatenate([x_real, x_adv])
     y_synth = np.array(x_real_label + x_adv_label)
-    shuffle = np.random.permutation(x_synth.shape[0])
-    x_synth = x_synth[shuffle]
-    y_synth = y_synth[shuffle]
+
+
+    #save the adverserial examples to plot
+    x_advs_plot.append(tile_images([x_adv[i] for i in range(10)],
+                        horizontal = False))
+
 
     #get the entropy and bald on this task
 
@@ -84,3 +92,9 @@ for ep in eps:
     plt.ylabel('TPR')
     plt.legend()
     plt.savefig(os.path.join("output", "ROC_eps_{}.png".format(ep)))
+
+#plot the adverserial images
+plt.figure()
+tile = tile_images(x_advs_plot, horizontal = True)
+plt.imshow(tile, cmap = 'gray_r')
+plt.savefig(os.path.join("output", "adv_images_ep_{}_to_{}.png".format(eps.min(), eps.max())))

@@ -8,6 +8,11 @@ import itertools as itr
 
 # %%
 
+def tile_images(imlist, horizontal = True):
+    ax = 1 if horizontal else 0
+    tile = np.concatenate([x.squeeze() for x in imlist], axis = ax)
+    return tile
+
 def get_mnist():
     # input image dimensions
     num_classes = 10
