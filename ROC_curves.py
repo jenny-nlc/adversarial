@@ -9,6 +9,7 @@ from keras import backend as K
 import itertools as itr
 from cleverhans.attacks_tf import fgm
 import os
+import sys
 
 from sklearn.metrics import roc_curve, roc_auc_score
 from src.utilities import *
@@ -48,8 +49,6 @@ else:
 eps = np.linspace(args.eps_min,args.eps_max,args.N_eps) #some random values of epsilon
 SYNTH_DATA_SIZE = args.N_data #actually twice this but whatever# %%
 
-
-
 x_test, y_test, x_train, y_train = get_mnist()
 
 
@@ -86,7 +85,14 @@ bald_aucs = []
 H_aucs = []
 
 plt.figure()
-for ep in eps:
+for i,ep in enumerate(eps):    
+
+
+    #log progress
+    print("iteration {} of {}, ep = {}".format(i, len(eps), ep)) 
+    sys.stdout.flush() #force a write if we have redirected output
+
+
     adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
 
     #choose a random sample from the test set
