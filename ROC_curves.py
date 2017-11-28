@@ -53,6 +53,7 @@ x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
 
 
 adv_distances = []
+plt.figure()
 for ep in eps:
     adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
 
@@ -89,7 +90,7 @@ for ep in eps:
     AUC_entropy = roc_auc_score(y_synth, entropy)
     AUC_bald    = roc_auc_score(y_synth, bald)
 
-    plt.figure()
+    plt.clf()
     plt.plot(fpr_entropy, tpr_entropy,
              label = "Entropy, AUC: {}".format(AUC_entropy))
     plt.plot(fpr_bald, tpr_bald,
