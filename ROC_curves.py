@@ -9,6 +9,7 @@ from keras import backend as K
 import itertools as itr
 from cleverhans.attacks_tf import fgm
 import os
+import sys
 
 from sklearn.metrics import roc_curve, roc_auc_score
 from src.utilities import *
@@ -16,7 +17,7 @@ from src.utilities import *
 
 
 eps = np.linspace(0.1,10,20) #some random values of epsilon
-SYNTH_DATA_SIZE = 2000 #actually twice this but whatever# %%
+SYNTH_DATA_SIZE = 5000 #actually twice this but whatever# %%
 norm = 2 #which norm to optimise against in the fast gradient sign
 
 
@@ -57,7 +58,14 @@ bald_aucs = []
 H_aucs = []
 
 plt.figure()
-for ep in eps:
+for i,ep in enumerate(eps):    
+
+
+    #log progress
+    print("iteration {} of {}, ep = {}".format(i, len(eps), ep)) 
+    sys.stdout.flush() #force a write if we have redirected output
+
+
     adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
 
     #choose a random sample from the test set
