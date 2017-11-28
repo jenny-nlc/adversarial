@@ -15,8 +15,8 @@ from src.utilities import *
 
 
 
-eps = np.linspace(0.1,10,4) #some random values of epsilon
-SYNTH_DATA_SIZE = 10 #actually twice this but whatever# %%
+eps = np.linspace(0.1,10,20) #some random values of epsilon
+SYNTH_DATA_SIZE = 2000 #actually twice this but whatever# %%
 norm = 2 #which norm to optimise against in the fast gradient sign
 
 
@@ -53,6 +53,9 @@ x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
 
 
 adv_distances = []
+bald_aucs = []
+H_aucs = []
+
 plt.figure()
 for ep in eps:
     adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
@@ -90,6 +93,9 @@ for ep in eps:
     AUC_entropy = roc_auc_score(y_synth, entropy)
     AUC_bald    = roc_auc_score(y_synth, bald)
 
+    H_aucs.append(AUC_entropy)
+    bald_aucs.append(AUC_bald)
+
     plt.clf()
     plt.plot(fpr_entropy, tpr_entropy,
              label = "Entropy, AUC: {}".format(AUC_entropy))
@@ -111,3 +117,10 @@ plt.plot(eps, adv_distances)
 plt.xlabel("FGSM Epsilon")
 plt.ylabel("Average L{} distance of advererial images".format(norm))
 plt.savefig(os.path.join("output", "{}_norm_eps_vs_avg_dist.png".format(norm)))
+
+plt.figure()
+plt.plot(eps, H_aucs, label = "Entropy")
+plt.plot(eps, bald_aucs, label = "BALD")
+plt.xlabel('FGM Epsilon')
+plt.ylabel('AUC')
+plt.savefig(os.path.join("output", "{}_norm_eps_vs_auc.png".format(norm)))
