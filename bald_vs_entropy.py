@@ -9,7 +9,7 @@ from keras import backend as K
 import itertools as itr
 from cleverhans.attacks_tf import fgm
 import os
-
+import sys
 from src.utilities import *
 # %%
 x_test, y_test, x_train, y_train = get_mnist()
@@ -20,8 +20,8 @@ K.set_learning_phase(True)
 model = load_model('mnist_cnn.h5')
 
 norm = 2
-tst = x_test[:10]
-tsty = y_test[:10]
+tst = x_test
+tsty = y_test
 n_mc = 50
 
 x = K.placeholder(shape = [None] +  list(x_test.shape[1:]))
@@ -31,13 +31,9 @@ bald_tensor     = BALD(mc_preds_tensor)
 get_output = K.function([x], [mc_preds_tensor,
                               mean_entropy_tensor,
                               bald_tensor])
-mc_samples, entropy, bald_acq = get_output([tst])
 
-preds_tensor = K.mean(mc_preds_tensor, axis = 0)
 
 #plot entropy and MI as a eps increases
-batches = list(batches_generator(tst, tsty, batch_size = 20))
-batches[-1]
 
 entropies = []
 balds = []
@@ -46,12 +42,21 @@ eps = np.linspace(0,10, 50)
 preds_tensor = K.mean(mc_preds_tensor, axis = 0)
 
 
-for ep in eps:
+for i, ep in enumerate(eps):
+
+    print("iteration",i,"of", len(eps), "epsilon", ep)
+    sys.stdout.flush()
+
     adv_tensor = fgm(x, preds_tensor, eps = ep, clip_min = 0, clip_max = 1, ord = norm)
     b_entropies = []
     b_balds    = []
     b_accs     = []
-    for bx, by in batches:
+
+    batches = batches_generator(tst, tsty, batch_size = 500)
+    for j,(bx, by) in enumerate(batches):
+	
+        print('    batch', j)
+        sys.stdout.flush()
 
         adv = adv_tensor.eval(session = K.get_session(), feed_dict = {x: bx})
         mc_samples, e_adv, b_adv = get_output([adv])
