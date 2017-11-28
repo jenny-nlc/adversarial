@@ -12,12 +12,41 @@ import os
 
 from sklearn.metrics import roc_curve, roc_auc_score
 from src.utilities import *
+import argparse
+
+parser = arparse.ArgumentParser()
+parser.add_argument('eps_min', type = float, default = 0.1,
+                    description = "Minimum value of epsilon to generate \
+                    adverserial examples with FGM")
+parser.add_argument('eps_max', type = float, default = 1,
+                    description = "Max value of epsilon to generate \
+                    adverserial examples with")
+parser.add_argument('N_eps', type = float, default = 10,
+                    description = "Number of values of epsilon to use \
+                    (linspace eps_min eps_max)")
+parser.add_argument('N_data', type = int, default = 100,
+                    description = "Number of examples of adverserial and \
+                    non-adverserial examples to use. If 0 will use the entire \
+                    dataset")
+parser.add_argument('norm', default = 'inf',
+                    description = "which norm to use: currently <- {1,2,inf}")
+parser.add_argument('N_mc', default = 50, type = int,
+                    description = "Number of MC forward passes to use.")
+
+args = parser.parse_args()
+
+if args.norm == 'inf':
+    norm = np.inf
+elif args.norm = '1':
+    norm = 1
+elif args.norm = '2':
+    norm = 2
+else:
+    raise NotImplementedError("Norms other than 1,2, inf not implemented")
 
 
-
-eps = np.linspace(0.1,10,20) #some random values of epsilon
-SYNTH_DATA_SIZE = 2000 #actually twice this but whatever# %%
-norm = 2 #which norm to optimise against in the fast gradient sign
+eps = np.linspace(args.eps_min,args.eps_max,args.N_eps) #some random values of epsilon
+SYNTH_DATA_SIZE = args.N_data #actually twice this but whatever# %%
 
 
 
