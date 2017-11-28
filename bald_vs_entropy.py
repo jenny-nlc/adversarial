@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from keras.models import load_model, save_model
 from keras import backend as K
 import itertools as itr
-from cleverhans.attacks_tf import fgsm
+from cleverhans.attacks_tf import fgm
 import os
 
 from src.utilities import *
@@ -19,6 +19,7 @@ K.set_learning_phase(True)
 #load the pre-trained model (trained by another file)
 model = load_model('mnist_cnn.h5')
 
+norm = 2
 tst = x_test[:10]
 tsty = y_test[:10]
 n_mc = 50
@@ -41,12 +42,12 @@ batches[-1]
 entropies = []
 balds = []
 accs = []
-eps = np.linspace(0,.5, 50)
+eps = np.linspace(0,10, 50)
 preds_tensor = K.mean(mc_preds_tensor, axis = 0)
-a
+
 
 for ep in eps:
-    adv_tensor = fgsm(x, preds_tensor, eps = ep, clip_min = 0, clip_max = 1)
+    adv_tensor = fgm(x, preds_tensor, eps = ep, clip_min = 0, clip_max = 1, ord = norm)
     b_entropies = []
     b_balds    = []
     b_accs     = []
@@ -80,4 +81,3 @@ def mk_plot(value, name):
 
 for v, n in zip(to_plot, names):
     mk_plot(v, n)
-

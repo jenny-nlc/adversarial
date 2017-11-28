@@ -5,6 +5,8 @@ scratch
 *.pyc
 *.png
 output/*
+server_output/*
 src/cleverhans
 src/pip-delete-this-directory.txt
 nohup.out
+sent_to_yarin/*

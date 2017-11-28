@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from keras.models import load_model, save_model
 from keras import backend as K
 import itertools as itr
-from cleverhans.attacks_tf import fgsm
+from cleverhans.attacks_tf import fgm
 import os
 
 from sklearn.metrics import roc_curve, roc_auc_score
@@ -15,9 +15,9 @@ from src.utilities import *
 
 
 
-eps = np.linspace(0.1,1,3) #some random values of epsilon
+eps = np.linspace(0.1,10,4) #some random values of epsilon
 SYNTH_DATA_SIZE = 10 #actually twice this but whatever# %%
-
+norm = 2 #which norm to optimise against in the fast gradient sign
 
 
 
@@ -51,8 +51,10 @@ x_advs_plot = [tile_images([x_to_adv[i] for i in range(10)], horizontal = False)
 x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)] #label zero for non adverserial input
 x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
 
+
+adv_distances = []
 for ep in eps:
-    adv_tensor = fgsm(x, preds_tensor, eps = ep, clip_min = 0, clip_max = 1)
+    adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
 
     #choose a random sample from the test set
 
@@ -60,6 +62,10 @@ for ep in eps:
     x_adv = adv_tensor.eval(session = K.get_session(),
                             feed_dict = {x: x_to_adv})
 
+
+    #calculate the L-norm distances between the adv examples and the originals
+    dists = batch_L_norm_distances(x_to_adv, x_adv, ord = norm)
+    adv_distances.append(dists.mean())
 
     #we now have some random samples of real and adverserial data.
     #shuffle them up
@@ -98,3 +104,9 @@ plt.figure()
 tile = tile_images(x_advs_plot, horizontal = True)
 plt.imshow(tile, cmap = 'gray_r')
 plt.savefig(os.path.join("output", "adv_images_ep_{}_to_{}.png".format(eps.min(), eps.max())))
+
+plt.figure()
+plt.plot(eps, adv_distances)
+plt.xlabel("FGSM Epsilon")
+plt.ylabel("Average L{} distance of advererial images".format(norm))
+plt.savefig(os.path.join("output", "{}_norm_eps_vs_avg_dist.png".format(norm)))

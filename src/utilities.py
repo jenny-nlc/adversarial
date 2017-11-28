@@ -5,9 +5,35 @@ import numpy as np
 from keras import backend as K
 from keras.datasets import mnist
 import itertools as itr
+from functools import reduce
+import operator
 
 # %%
+def batch_L_norm_distances(X, Y, ord = 2):
+    """
+    Takes 2 arrays of N x d examples and calculates the p-norm between
+    them. Result is dimension N. If the inputs are N x h x w etc, they
+    are first flattened to be N x d
+    """
+    assert X.shape == Y.shape, "X and Y must have the same dimensions"
+    N = X.shape[0]
+    rest = X.shape[1:]
+    d = reduce(operator.mul, rest, 1) #product of leftover dimensions
 
+    x = X.reshape(N, d)
+    y = Y.reshape(N, d)
+
+    if ord == 2:
+        return np.sum((x - y) ** 2, axis = 1)
+    elif ord ==1 :
+        return np.sum(np.abs(x - y), axis = 1)
+    elif ord == 0:
+        return np.isclose(x, y).astype(np.float).sum(axis = 1) 
+        #return the number of entries in x that differ from y. Use a tolerance to allow numerical precision errors.
+    elif ord == np.inf:
+        return np.max(np.abs(x - y), axis = 1)
+    else:
+        raise NotImplementedError("Norms other than 0, 1, 2, inf not implemented")
 def tile_images(imlist, horizontal = True):
     ax = 1 if horizontal else 0
     tile = np.concatenate([x.squeeze() for x in imlist], axis = ax)
