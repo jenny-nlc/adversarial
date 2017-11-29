@@ -56,7 +56,7 @@ K.set_learning_phase(True)
 #load the pre-trained model (trained by another file)
 model = load_model('mnist_cnn.h5')
 
-n_mc = 50
+n_mc = args.N_mc
 
 x = K.placeholder(shape = [None] +  list(x_test.shape[1:]))
 mc_preds_tensor = mc_dropout_preds(model, x, n_mc)
@@ -158,4 +158,5 @@ plt.plot(eps, H_aucs, label = "Entropy")
 plt.plot(eps, bald_aucs, label = "BALD")
 plt.xlabel('FGM Epsilon')
 plt.ylabel('AUC')
+plt.legend()
 plt.savefig(os.path.join("output", "{}_norm_eps_vs_auc.png".format(norm)))

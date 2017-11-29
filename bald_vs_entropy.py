@@ -11,7 +11,27 @@ from cleverhans.attacks_tf import fgm
 import os
 import sys
 from src.utilities import *
-# %%
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--eps_min', type = float, default = 0.1,
+                    help = "Minimum value of epsilon to generate \
+                    adverserial examples with FGM")
+parser.add_argument('--eps_max', type = float, default = 1,
+                    help = "Max value of epsilon to generate \
+                    adverserial examples with")
+parser.add_argument('--N_eps', type = float, default = 50,
+                    help = "Number of values of epsilon to use \
+                    (linspace eps_min eps_max)")
+parser.add_argument('--N_data', type = int, default = 100,
+                    help = "Number of examples from the training set to use")
+parser.add_argument('--norm', default = 'inf',
+                    help = "which norm to use: currently <- {1,2,inf}")
+parser.add_argument('--N_mc', default = 50, type = int,
+                    help = "Number of MC forward passes to use.")
+
+args = parser.parse_args()
+
 x_test, y_test, x_train, y_train = get_mnist()
 
 
@@ -19,10 +39,18 @@ K.set_learning_phase(True)
 #load the pre-trained model (trained by another file)
 model = load_model('mnist_cnn.h5')
 
-norm = 2
-tst = x_test
-tsty = y_test
-n_mc = 50
+eps = np.linspace(args.eps_min,args.eps_max, args.N_eps)
+if args.norm == 'inf':
+    norm = np.inf
+elif args.norm == '1':
+    norm = 1
+elif args.norm == '2':
+    norm = 2
+else:
+    raise NotImplementedError("Norms other than 1,2, inf not implemented")
+tst = x_test[:args.N_data]
+tsty = y_test[:args.N_data]
+n_mc = args.N_mc
 
 x = K.placeholder(shape = [None] +  list(x_test.shape[1:]))
 mc_preds_tensor = mc_dropout_preds(model, x, n_mc)
@@ -38,7 +66,7 @@ get_output = K.function([x], [mc_preds_tensor,
 entropies = []
 balds = []
 accs = []
-eps = np.linspace(0,10, 50)
+
 preds_tensor = K.mean(mc_preds_tensor, axis = 0)
 
 
@@ -54,7 +82,7 @@ for i, ep in enumerate(eps):
 
     batches = batches_generator(tst, tsty, batch_size = 500)
     for j,(bx, by) in enumerate(batches):
-	
+
         print('    batch', j)
         sys.stdout.flush()
 
