@@ -101,7 +101,6 @@ for i,ep in enumerate(eps):
 
     adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
 
-    #choose a random sample from the test set
 
 
     x_adv = adv_tensor.eval(session = K.get_session(),
