@@ -28,7 +28,7 @@ def batch_L_norm_distances(X, Y, ord = 2):
     elif ord ==1 :
         return np.sum(np.abs(x - y), axis = 1)
     elif ord == 0:
-        return np.isclose(x, y).astype(np.float).sum(axis = 1) 
+        return np.isclose(x, y).astype(np.float).sum(axis = 1)
         #return the number of entries in x that differ from y. Use a tolerance to allow numerical precision errors.
     elif ord == np.inf:
         return np.max(np.abs(x - y), axis = 1)
@@ -40,7 +40,9 @@ def tile_images(imlist, horizontal = True):
     return tile
 
 def get_mnist():
-    # input image dimensions
+    """
+    Return the mnist data, scaled to [0,1].
+    """
     num_classes = 10
     img_rows, img_cols = 28, 28
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -97,7 +99,7 @@ def BALD(mc_preds):
     the difference between the mean of the entropy and the entropy of the mean
     of the predicted distribution on the n_mc x batch_size x n_classes tensor mc_preds
     """
-    #note that H := entropy
+    #H := entropy. saves a few keystrokes
     expectation_H = m_entropy(mc_preds) #batch_size
 
     expected_p = K.mean(mc_preds, axis = 0) #batch_size x n_classes

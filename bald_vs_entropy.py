@@ -12,7 +12,10 @@ import os
 import sys
 from src.utilities import *
 import argparse
-
+"""
+This script calculates adversarial examples using fgm for a range of step-sizes
+epsilon, and plots the entropy and the BALD score at all of them.
+"""
 parser = argparse.ArgumentParser()
 parser.add_argument('--eps_min', type = float, default = 0.1,
                     help = "Minimum value of epsilon to generate \
@@ -36,7 +39,7 @@ x_test, y_test, x_train, y_train = get_mnist()
 
 
 K.set_learning_phase(True)
-#load the pre-trained model (trained by another file)
+#load the pre-trained model (trained using this script https://github.com/yaringal/acquisition_example)
 model = load_model('mnist_cnn.h5')
 
 eps = np.linspace(args.eps_min,args.eps_max, args.N_eps)
@@ -48,6 +51,8 @@ elif args.norm == '2':
     norm = 2
 else:
     raise NotImplementedError("Norms other than 1,2, inf not implemented")
+
+#could be an idea to shuffle before we do this later on.
 tst = x_test[:args.N_data]
 tsty = y_test[:args.N_data]
 n_mc = args.N_mc
@@ -84,7 +89,7 @@ for i, ep in enumerate(eps):
     for j,(bx, by) in enumerate(batches):
 
         print('    batch', j)
-        sys.stdout.flush()
+        sys.stdout.flush() #in case we are writing to a log file not stdout
 
         adv = adv_tensor.eval(session = K.get_session(), feed_dict = {x: bx})
         mc_samples, e_adv, b_adv = get_output([adv])

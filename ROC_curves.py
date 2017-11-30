@@ -15,6 +15,12 @@ from sklearn.metrics import roc_curve, roc_auc_score
 from src.utilities import *
 import argparse
 
+"""
+This script compares the ROC for entropy and BALD for fgm with a given norm at
+various stepsizes epsilon. It plots and saves these curves, and also plots a
+sample of the adverserial examples generated for visualisation.
+"""
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--eps_min', type = float, default = 0.1,
                     help = "Minimum value of epsilon to generate \
@@ -46,8 +52,8 @@ else:
     raise NotImplementedError("Norms other than 1,2, inf not implemented")
 
 
-eps = np.linspace(args.eps_min,args.eps_max,args.N_eps) #some random values of epsilon
-SYNTH_DATA_SIZE = args.N_data #actually twice this but whatever# 
+eps = np.linspace(args.eps_min,args.eps_max,args.N_eps)
+SYNTH_DATA_SIZE = args.N_data
 
 x_test, y_test, x_train, y_train = get_mnist()
 
@@ -90,7 +96,7 @@ for i,ep in enumerate(eps):
 
     #log progress
     print("iteration {} of {}, ep = {}".format(i, len(eps), ep))
-    sys.stdout.flush() #force a write if we have redirected output
+    sys.stdout.flush() #force a write if we have redirected stdout
 
 
     adv_tensor = fgm(x, preds_tensor, eps = ep, ord = norm, clip_min = 0, clip_max = 1)
@@ -106,8 +112,6 @@ for i,ep in enumerate(eps):
     dists = batch_L_norm_distances(x_to_adv, x_adv, ord = norm)
     adv_distances.append(dists.mean())
 
-    #we now have some random samples of real and adverserial data.
-    #shuffle them up
 
     x_synth = np.concatenate([x_real, x_adv])
     y_synth = np.array(x_real_label + x_adv_label)
@@ -131,7 +135,7 @@ for i,ep in enumerate(eps):
     H_aucs.append(AUC_entropy)
     bald_aucs.append(AUC_bald)
 
-    plt.clf()
+    plt.clf() #avoid making too many figures by resuing the same one
     plt.plot(fpr_entropy, tpr_entropy,
              label = "Entropy, AUC: {}".format(AUC_entropy))
     plt.plot(fpr_bald, tpr_bald,
