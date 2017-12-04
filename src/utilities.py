@@ -9,7 +9,7 @@ from functools import reduce
 import operator
 
 # %%
-def batch_L_norm_distances(X, Y, ord = 2):
+def batch_L_norm_distances(X: np.array, Y: np.array, ord = 2) -> np.array:
     """
     Takes 2 arrays of N x d examples and calculates the p-norm between
     them. Result is dimension N. If the inputs are N x h x w etc, they
@@ -29,12 +29,18 @@ def batch_L_norm_distances(X, Y, ord = 2):
         return np.sum(np.abs(x - y), axis = 1)
     elif ord == 0:
         return np.isclose(x, y).astype(np.float).sum(axis = 1)
-        #return the number of entries in x that differ from y. Use a tolerance to allow numerical precision errors.
+        #return the number of entries in x that differ from y. 
+        # Use a tolerance to allow numerical precision errors.
     elif ord == np.inf:
         return np.max(np.abs(x - y), axis = 1)
     else:
-        raise NotImplementedError("Norms other than 0, 1, 2, inf not implemented")
-def tile_images(imlist, horizontal = True):
+        raise NotImplementedError(
+            "Norms other than 0, 1, 2, inf not implemented")
+def tile_images(imlist: [np.array], horizontal = True) -> np.array:
+    """
+    Takes a list of images and tiles them into a single image for plotting 
+    purposes.
+    """
     ax = 1 if horizontal else 0
     tile = np.concatenate([x.squeeze() for x in imlist], axis = ax)
     return tile
@@ -68,7 +74,7 @@ def get_mnist():
     return x_train, y_train, x_test, y_test
 
 
-def mc_dropout_preds(model, x, n_mc):
+def mc_dropout_preds(model, x: tf.Tensor, n_mc: int) -> tf.Tensor:
     """
     Take a model, and a tensor of size batch_size x n_classes and return the
     result of doing n_mc stochastic forward passes as a n_mc x batch_size x
@@ -83,21 +89,24 @@ def mc_dropout_preds(model, x, n_mc):
     return mc_preds
 
 
-def m_entropy(mc_preds):
+def m_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
-    Take a (symbolic) tensor mc_preds [n_mc x batch_size x n_classes] and return the mean entropy of the predictive distribution across the MC samples.
+    Take a tensor mc_preds [n_mc x batch_size x n_classes] and return the
+    mean entropy of the predictive distribution across the MC samples.
     """
 
     entropy = K.sum(
-                    -mc_preds * tf.log(tf.clip_by_value(mc_preds, 1e-10, 1.0)), #avoid log 0
+                    -mc_preds * tf.log(tf.clip_by_value(mc_preds, 1e-10, 1.0)), 
+                    #avoid log 0
                     axis = -1) #n_mc x batch_size
     return K.mean(entropy, axis = 0) #batch_size
 
-def BALD(mc_preds):
+def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     """
     Calculate the BALD (Bayesian Active Learning by Disagreement) of a model;
     the difference between the mean of the entropy and the entropy of the mean
-    of the predicted distribution on the n_mc x batch_size x n_classes tensor mc_preds
+    of the predicted distribution on the n_mc x batch_size x n_classes tensor
+    mc_preds
     """
     #H := entropy. saves a few keystrokes
     expectation_H = m_entropy(mc_preds) #batch_size
@@ -110,7 +119,7 @@ def BALD(mc_preds):
     BALD = H_expectation - expectation_H
     return BALD
 
-def batches_generator(x, y, batch_size = 100):
+def batches_generator(x: np.array, y: np.array, batch_size = 100):
 
     #todo; maybe add the ability to shuffle?
     N = x.shape[0]
@@ -123,6 +132,7 @@ def batches_generator(x, y, batch_size = 100):
 
 def batch_eval(k_function, batch_iterable):
     """
-    eval a keras function across a list, hiding the fact that keras requires you to pass a list to everything for some reason.
+    eval a keras function across a list, hiding the fact that keras requires
+    you to pass a list to everything for some reason.
     """
     return [k_function([bx]) for bx in batch_iterable]
