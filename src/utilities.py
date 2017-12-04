@@ -9,7 +9,9 @@ from functools import reduce
 import operator
 
 # %%
-def batch_L_norm_distances(X: np.array, Y: np.array, ord = 2) -> np.array:
+
+
+def batch_L_norm_distances(X: np.array, Y: np.array, ord=2) -> np.array:
     """
     Takes 2 arrays of N x d examples and calculates the p-norm between
     them. Result is dimension N. If the inputs are N x h x w etc, they
@@ -18,32 +20,35 @@ def batch_L_norm_distances(X: np.array, Y: np.array, ord = 2) -> np.array:
     assert X.shape == Y.shape, "X and Y must have the same dimensions"
     N = X.shape[0]
     rest = X.shape[1:]
-    d = reduce(operator.mul, rest, 1) #product of leftover dimensions
+    d = reduce(operator.mul, rest, 1)  # product of leftover dimensions
 
     x = X.reshape(N, d)
     y = Y.reshape(N, d)
 
     if ord == 2:
-        return np.sum((x - y) ** 2, axis = 1)
-    elif ord ==1 :
-        return np.sum(np.abs(x - y), axis = 1)
+        return np.sum((x - y) ** 2, axis=1)
+    elif ord == 1:
+        return np.sum(np.abs(x - y), axis=1)
     elif ord == 0:
-        return np.isclose(x, y).astype(np.float).sum(axis = 1)
-        #return the number of entries in x that differ from y. 
+        return np.isclose(x, y).astype(np.float).sum(axis=1)
+        # return the number of entries in x that differ from y.
         # Use a tolerance to allow numerical precision errors.
     elif ord == np.inf:
-        return np.max(np.abs(x - y), axis = 1)
+        return np.max(np.abs(x - y), axis=1)
     else:
         raise NotImplementedError(
             "Norms other than 0, 1, 2, inf not implemented")
-def tile_images(imlist: [np.array], horizontal = True) -> np.array:
+
+
+def tile_images(imlist: [np.array], horizontal=True) -> np.array:
     """
     Takes a list of images and tiles them into a single image for plotting 
     purposes.
     """
     ax = 1 if horizontal else 0
-    tile = np.concatenate([x.squeeze() for x in imlist], axis = ax)
+    tile = np.concatenate([x.squeeze() for x in imlist], axis=ax)
     return tile
+
 
 def get_mnist():
     """
@@ -83,9 +88,9 @@ def mc_dropout_preds(model, x: tf.Tensor, n_mc: int) -> tf.Tensor:
     keras.backend.set_learning_phase(True). Also note that this takes and
     returns keras tensors, not arrays.
     """
-    #tile x n_mc times and predict in a batch
+    # tile x n_mc times and predict in a batch
     xs = K.stack(list(itr.repeat(x, n_mc)))
-    mc_preds = K.map_fn(model, xs) #[n_mc x batch_size x n_classes]
+    mc_preds = K.map_fn(model, xs)  # [n_mc x batch_size x n_classes]
     return mc_preds
 
 
@@ -96,10 +101,11 @@ def m_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
 
     entropy = K.sum(
-                    -mc_preds * tf.log(tf.clip_by_value(mc_preds, 1e-10, 1.0)), 
-                    #avoid log 0
-                    axis = -1) #n_mc x batch_size
-    return K.mean(entropy, axis = 0) #batch_size
+        -mc_preds * tf.log(tf.clip_by_value(mc_preds, 1e-10, 1.0)),
+        # avoid log 0
+        axis=-1)  # n_mc x batch_size
+    return K.mean(entropy, axis=0)  # batch_size
+
 
 def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     """
@@ -108,20 +114,21 @@ def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     of the predicted distribution on the n_mc x batch_size x n_classes tensor
     mc_preds
     """
-    #H := entropy. saves a few keystrokes
-    expectation_H = m_entropy(mc_preds) #batch_size
+    # H := entropy. saves a few keystrokes
+    expectation_H = m_entropy(mc_preds)  # batch_size
 
-    expected_p = K.mean(mc_preds, axis = 0) #batch_size x n_classes
+    expected_p = K.mean(mc_preds, axis=0)  # batch_size x n_classes
     H_expectation = K.sum(
         - expected_p * K.log(K.clip(expected_p, 1e-10, 1.0)),
-        axis = -1
-    ) #batch_size
+        axis=-1
+    )  # batch_size
     BALD = H_expectation - expectation_H
     return BALD
 
-def batches_generator(x: np.array, y: np.array, batch_size = 100):
 
-    #todo; maybe add the ability to shuffle?
+def batches_generator(x: np.array, y: np.array, batch_size=100):
+
+    # todo; maybe add the ability to shuffle?
     N = x.shape[0]
     n_batches = N // batch_size + (N % batch_size != 0)
     for i in range(n_batches):
