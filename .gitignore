@@ -10,3 +10,5 @@ src/cleverhans
 src/pip-delete-this-directory.txt
 nohup.out
 sent_to_yarin/*
+.vscode/
+env/
