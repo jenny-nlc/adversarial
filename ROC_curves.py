@@ -62,7 +62,7 @@ n_mc = args.N_mc
 
 x = K.placeholder(shape=[None] + list(x_test.shape[1:]))
 mc_preds_tensor = mc_dropout_preds(model, x, n_mc)
-mean_entropy_tensor = m_entropy(mc_preds_tensor)
+entropy_mean_tensor = entropy_m(mc_preds_tensor)
 bald_tensor = BALD(mc_preds_tensor)
 get_output = K.function([x], [mc_preds_tensor,
                               mean_entropy_tensor,
