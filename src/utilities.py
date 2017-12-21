@@ -93,6 +93,8 @@ def mc_dropout_preds(model, x: tf.Tensor, n_mc: int) -> tf.Tensor:
     mc_preds = K.map_fn(model, xs)  # [n_mc x batch_size x n_classes]
     return mc_preds
 
+def entropy(X: tf.Tensor) -> tf.Tensor:
+    return K.sum( - X * K.log( K.clip(X, 1e-10, 1)), axis = -1)
 
 def m_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
@@ -100,23 +102,14 @@ def m_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     mean entropy of the predictive distribution across the MC samples.
     """
 
-    entropy = K.sum(
-        -mc_preds * tf.log(tf.clip_by_value(mc_preds, 1e-10, 1.0)),
-        # avoid log 0
-        axis=-1)  # n_mc x batch_size
-    return K.mean(entropy, axis=0)  # batch_size
+    return K.mean(entropy(mc_preds), axis=0)  # batch_size
 
 def entropy_m(mc_preds: tf.Tensor) -> tf.Tensor:
     """
     Take a tensor mc_preds [n_mc x batch_size x n_classes] and return the
     entropy of the mean predictive distribution across the MC samples.
     """
-    expected_p = K.mean(mc_preds, axis=0)  # batch_size x n_classes
-    H_expectation = K.sum(
-        - expected_p * K.log(K.clip(expected_p, 1e-10, 1.0)),
-        axis=-1
-    )  # batch_size
-    return H_expectation
+    return entropy( K.mean(mc_preds, axis=0))
 
 def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     """
