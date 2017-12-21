@@ -107,7 +107,7 @@ class ConcreteDropout(Wrapper):
         retain_prob = 1. - self.p
         x *= random_tensor
         x /= retain_prob
-        #print 'concrete dropout is called :)'
+        #print( 'concrete dropout is called :)')
         return x
 
     def call(self, inputs, training=None):
