@@ -96,7 +96,7 @@ def mc_dropout_preds(model, x: tf.Tensor, n_mc: int) -> tf.Tensor:
 def entropy(X: tf.Tensor) -> tf.Tensor:
     return K.sum( - X * K.log( K.clip(X, 1e-10, 1)), axis = -1)
 
-def m_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
+def expected_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
     Take a tensor mc_preds [n_mc x batch_size x n_classes] and return the
     mean entropy of the predictive distribution across the MC samples.
@@ -104,7 +104,7 @@ def m_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
 
     return K.mean(entropy(mc_preds), axis=0)  # batch_size
 
-def entropy_m(mc_preds: tf.Tensor) -> tf.Tensor:
+def predictive_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
     Take a tensor mc_preds [n_mc x batch_size x n_classes] and return the
     entropy of the mean predictive distribution across the MC samples.
@@ -118,10 +118,7 @@ def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     of the predicted distribution on the n_mc x batch_size x n_classes tensor
     mc_preds
     """
-    # H := entropy. saves a few keystrokes
-    expectation_H = m_entropy(mc_preds)  # batch_size
-    H_expectation = entropy_m(mc_preds) 
-    BALD = H_expectation - expectation_H
+    BALD = predictive_entropy(mc_preds) - expected_entropy(mc_preds)
     return BALD
 
 def batches_generator(x: np.array, y: np.array, batch_size=100):
