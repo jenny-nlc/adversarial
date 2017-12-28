@@ -33,7 +33,7 @@ x_test, y_test, x_train, y_train = U.get_mnist()
 
 
 K.set_learning_phase(True)
-# load the pre-trained model 
+# load the pre-trained model
 # (trained using this script https://github.com/yaringal/acquisition_example)
 model = load_model('mnist_cnn.h5')
 
