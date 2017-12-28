@@ -8,7 +8,8 @@ import itertools as itr
 from functools import reduce
 import operator
 
-# %%
+# %%
+
 
 
 def batch_L_norm_distances(X: np.array, Y: np.array, ord=2) -> np.array:
@@ -42,7 +43,7 @@ def batch_L_norm_distances(X: np.array, Y: np.array, ord=2) -> np.array:
 
 def tile_images(imlist: [np.array], horizontal=True) -> np.array:
     """
-    Takes a list of images and tiles them into a single image for plotting 
+    Takes a list of images and tiles them into a single image for plotting
     purposes.
     """
     ax = 1 if horizontal else 0
@@ -91,8 +92,10 @@ def mc_dropout_preds(model, x: tf.Tensor, n_mc: int) -> tf.Tensor:
     mc_preds = K.map_fn(model, xs)  # [n_mc x batch_size x n_classes]
     return mc_preds
 
+
 def entropy(X: tf.Tensor) -> tf.Tensor:
-    return K.sum( - X * K.log( K.clip(X, 1e-10, 1)), axis = -1)
+    return K.sum(- X * K.log(K.clip(X, 1e-10, 1)), axis=-1)
+
 
 def expected_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
@@ -102,12 +105,14 @@ def expected_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
 
     return K.mean(entropy(mc_preds), axis=0)  # batch_size
 
+
 def predictive_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
     """
     Take a tensor mc_preds [n_mc x batch_size x n_classes] and return the
     entropy of the mean predictive distribution across the MC samples.
     """
-    return entropy( K.mean(mc_preds, axis=0))
+    return entropy(K.mean(mc_preds, axis=0))
+
 
 def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     """
@@ -118,6 +123,7 @@ def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
     """
     BALD = predictive_entropy(mc_preds) - expected_entropy(mc_preds)
     return BALD
+
 
 def batches_generator(x: np.array, y: np.array, batch_size=100):
 
