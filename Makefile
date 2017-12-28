@@ -3,3 +3,8 @@
 check:
 	pyflakes *.py
 	pyflakes src/*.py
+pep8:
+	pep8 src/*.py
+	pep9 *.py
+tags:
+	ctags -R -f ./.tags .
