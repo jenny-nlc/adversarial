@@ -1,14 +1,11 @@
-import itertools as itr
-import tensorflow as tf
 from cleverhans.attacks_tf import fgm
 import os
 import sys
-import keras
 import numpy as np
-from keras.models import load_model, save_model
+from keras.models import load_model
 from keras import backend as K
 from sklearn.metrics import roc_curve, roc_auc_score
-from src.utilities import *
+import src.utilities as U
 import argparse
 import matplotlib as mpl
 mpl.use('Agg')
@@ -51,7 +48,7 @@ else:
 eps = np.linspace(args.eps_min, args.eps_max, args.N_eps)
 SYNTH_DATA_SIZE = args.N_data
 
-x_test, y_test, x_train, y_train = get_mnist()
+x_test, y_test, x_train, y_train = U.get_mnist()
 
 
 K.set_learning_phase(True)
@@ -61,11 +58,11 @@ model = load_model('mnist_cnn.h5')
 n_mc = args.N_mc
 
 x = K.placeholder(shape=[None] + list(x_test.shape[1:]))
-mc_preds_tensor = mc_dropout_preds(model, x, n_mc)
-entropy_mean_tensor = predictive_entropy(mc_preds_tensor)
-bald_tensor = BALD(mc_preds_tensor)
+mc_preds_tensor = U.mc_dropout_preds(model, x, n_mc)
+entropy_mean_tensor = U.predictive_entropy(mc_preds_tensor)
+bald_tensor = U.BALD(mc_preds_tensor)
 get_output = K.function([x], [mc_preds_tensor,
-                              mean_entropy_tensor,
+                              entropy_mean_tensor,
                               bald_tensor])
 
 
@@ -77,7 +74,7 @@ preds_tensor = K.mean(mc_preds_tensor, axis=0)
 x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
 x_to_adv = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
 
-x_advs_plot = [tile_images([x_to_adv[i] for i in range(10)], horizontal=False)]
+x_advs_plot = [U.tile_images([x_to_adv[i] for i in range(10)], horizontal=False)]
 
 # label zero for non adverserial input
 x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)]
@@ -101,14 +98,14 @@ for i, ep in enumerate(eps):
                             feed_dict={x: x_to_adv})
 
     # calculate the L-norm distances between the adv examples and the originals
-    dists = batch_L_norm_distances(x_to_adv, x_adv, ord=norm)
+    dists = U.batch_L_norm_distances(x_to_adv, x_adv, ord=norm)
     adv_distances.append(dists.mean())
 
     x_synth = np.concatenate([x_real, x_adv])
     y_synth = np.array(x_real_label + x_adv_label)
 
     # save the adverserial examples to plot
-    x_advs_plot.append(tile_images([x_adv[i] for i in range(10)],
+    x_advs_plot.append(U.tile_images([x_adv[i] for i in range(10)],
                                    horizontal=False))
 
     # get the entropy and bald on this task
@@ -140,7 +137,7 @@ for i, ep in enumerate(eps):
 
 # plot the adverserial images
 plt.figure()
-tile = tile_images(x_advs_plot, horizontal=True)
+tile = U.tile_images(x_advs_plot, horizontal=True)
 plt.imshow(tile, cmap='gray_r')
 plt.savefig(os.path.join(
     "output", "adv_images_ep_{}_to_{}.png".format(eps.min(), eps.max())))

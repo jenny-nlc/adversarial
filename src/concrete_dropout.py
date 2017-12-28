@@ -5,7 +5,7 @@ import keras.backend as K
 from keras import initializers	# for Keras 2.0
 #from keras import initializations as initializers	# for Keras 1.x.y
 from keras.engine import InputSpec
-from keras.layers import Dense, Lambda, Wrapper
+from keras.layers import Wrapper
 
 class ConcreteDropout(Wrapper):
     """This wrapper allows to learn the dropout probability for any given input layer.
