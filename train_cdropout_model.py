@@ -64,7 +64,7 @@ model.compile(loss=keras.losses.categorical_crossentropy,
         optimizer=keras.optimizers.Adadelta(),
         metrics=['accuracy'])
 
-model.fit(x_train[:20], y_train[:20],
+model.fit(x_train, y_train,
         batch_size=batch_size,
         epochs=epochs,
         validation_data=(x_test, y_test),
