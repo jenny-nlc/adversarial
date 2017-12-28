@@ -1,14 +1,16 @@
-#The concrete dropout code was written by Yingzhen Li (MIT Licensed.): 
-#source here https://github.com/YingzhenLi/Dropout_BBalpha/tree/concrete
+# The concrete dropout code was written by Yingzhen Li (MIT Licensed.):
+# source here https://github.com/YingzhenLi/Dropout_BBalpha/tree/concrete
 import numpy as np
 import keras.backend as K
-from keras import initializers	# for Keras 2.0
-#from keras import initializations as initializers	# for Keras 1.x.y
+from keras import initializers  # for Keras 2.0
+# from keras import initializations as initializers	# for Keras 1.x.y
 from keras.engine import InputSpec
 from keras.layers import Wrapper
 
+
 class ConcreteDropout(Wrapper):
-    """This wrapper allows to learn the dropout probability for any given input layer.
+    """This wrapper allows to learn the dropout probability for any given input
+    layer.
     ```python
         # as the first layer in a model
         model = Sequential()
@@ -30,7 +32,8 @@ class ConcreteDropout(Wrapper):
         weight_regularizer:
             A positive number which satisfies
                 $weight_regularizer = l**2 / (\tau * N)$
-            with prior lengthscale l, model precision $\tau$ (inverse observation noise),
+            with prior lengthscale l, model precision $\tau$
+            (inverse observation noise),
             and N the number of instances in the dataset.
             Note that kernel_regularizer is not needed.
         dropout_regularizer:
@@ -62,14 +65,15 @@ class ConcreteDropout(Wrapper):
         if not self.layer.built:
             self.layer.build(input_shape)
             self.layer.built = True
-        super(ConcreteDropout, self).build()  # this is very weird.. we must call super before we add new losses
+        super(ConcreteDropout, self).build()
+        # this is very weird.. we must call super before we add new losses
 
         # initialise p
-        RandomUniform = initializers.RandomUniform	# for Keras 2.0
+        RandomUniform = initializers.RandomUniform  # for Keras 2.0
         self.p_logit = self.layer.add_weight(name='p_logit',
-                                            shape=(1,),
-                                            initializer=RandomUniform(self.init_min, self.init_max),
-                                            trainable=True)
+                                             shape=(1,),
+                                             initializer=RandomUniform(self.init_min, self.init_max),
+                                             trainable=True)
         self.p = K.sigmoid(self.p_logit[0])
 
         # initialise regulariser / prior KL term
@@ -97,7 +101,6 @@ class ConcreteDropout(Wrapper):
         unif_noise = K.random_uniform(shape=K.shape(x))
         drop_prob = (
             K.log(self.p + eps)
-            - K.log(1. - self.p + eps)
             + K.log(unif_noise + eps)
             - K.log(1. - unif_noise + eps)
         )
@@ -107,7 +110,7 @@ class ConcreteDropout(Wrapper):
         retain_prob = 1. - self.p
         x *= random_tensor
         x /= retain_prob
-        #print( 'concrete dropout is called :)')
+        # print( 'concrete dropout is called :)')
         return x
 
     def call(self, inputs, training=None):
