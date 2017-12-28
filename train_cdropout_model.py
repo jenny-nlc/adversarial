@@ -29,13 +29,13 @@ class TrackConcreteDropoutP(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
         self.ps = []
         self.losses = []
- 
+
     def on_train_end(self, logs={}):
         return
- 
+
     def on_epoch_begin(self, epoch, logs={}):
         return
- 
+
     def on_epoch_end(self, epoch, logs={}):
         self.losses.append(logs.get('loss'))
         ps_tensor = [x.p for x in self.model.layers if 'concrete_dropout' in x.name]
@@ -44,10 +44,10 @@ class TrackConcreteDropoutP(keras.callbacks.Callback):
         self.ps.append(p)
         print(" - concrete ps: ", p)
         return
- 
+
     def on_batch_begin(self, batch, logs={}):
         return
- 
+
     def on_batch_end(self, batch, logs={}):
         return
 
