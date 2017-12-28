@@ -1,16 +1,13 @@
-import tensorflow as tf
-import keras
 import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
 from matplotlib import pyplot as plt
-from keras.models import load_model, save_model
+from keras.models import load_model
 from keras import backend as K
-import itertools as itr
 from cleverhans.attacks_tf import fgm
 import os
 import sys
-from src.utilities import *
+import src.utilities as U
 import argparse
 """
 This script calculates adversarial examples using fgm for a range of step-sizes
@@ -32,7 +29,7 @@ parser.add_argument('--N_mc', default=50, type=int, help="Number of MC forward \
 
 args = parser.parse_args()
 
-x_test, y_test, x_train, y_train = get_mnist()
+x_test, y_test, x_train, y_train = U.get_mnist()
 
 
 K.set_learning_phase(True)
@@ -56,11 +53,11 @@ tsty = y_test[:args.N_data]
 n_mc = args.N_mc
 
 x = K.placeholder(shape=[None] + list(x_test.shape[1:]))
-mc_preds_tensor = mc_dropout_preds(model, x, n_mc)
-entropy_mean_tensor = predictive_entropy(mc_preds_tensor)
-bald_tensor = BALD(mc_preds_tensor)
+mc_preds_tensor = U.mc_dropout_preds(model, x, n_mc)
+entropy_mean_tensor = U.predictive_entropy(mc_preds_tensor)
+bald_tensor = U.BALD(mc_preds_tensor)
 get_output = K.function([x], [mc_preds_tensor,
-                              mean_entropy_tensor,
+                              entropy_mean_tensor,
                               bald_tensor])
 
 
@@ -83,7 +80,7 @@ for i, ep in enumerate(eps):
     b_balds = []
     b_accs = []
 
-    batches = batches_generator(tst, tsty, batch_size=500)
+    batches = U.batches_generator(tst, tsty, batch_size=500)
     for j, (bx, by) in enumerate(batches):
 
         print('    batch', j)
