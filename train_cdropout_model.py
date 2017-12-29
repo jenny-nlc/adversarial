@@ -18,7 +18,7 @@ model = Sequential()
 
 act_fn = 'relu'
 input_shape = (28,28,1)
-epochs=12
+epochs=20
 batch_size = 128
 num_classes = 10
 
@@ -61,7 +61,7 @@ model.add(ConcreteDropout(Dense(128, activation=act_fn)))
 model.add(ConcreteDropout(Dense(num_classes, activation='softmax')))
 
 model.compile(loss=keras.losses.categorical_crossentropy,
-        optimizer=keras.optimizers.Adadelta(),
+        optimizer=keras.optimizers.Adagrad(),
         metrics=['accuracy'])
 
 model.fit(x_train, y_train,
