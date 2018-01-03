@@ -21,7 +21,7 @@ def HMC_run(model: keras.models.Model,
             ep: float,
             tau: int,
             burn_in: int,
-            between_sample: int,
+            sample_every: int,
             return_extra=False,
             verbose=True,
             ):
@@ -43,7 +43,7 @@ def HMC_run(model: keras.models.Model,
         return res[0], res[1:]
     losses = []
 
-    mc_preds = np.zeros([x_test.shape[0]] + list(Y.shape[1:]))
+    mc_preds = []
     n_mc = 0
     weights = []
     accept_n = 0
@@ -58,7 +58,7 @@ def HMC_run(model: keras.models.Model,
         H = .5 * sum([np.sum(p ** 2) for p in ps]) + obj
 
         ws = [K.eval(w) for w in Ws]
-        weights.append([ws[0][0], ws[0][1], ws[1]])
+        weights.append(ws)
         ws_old = [K.eval(w) for w in Ws]
         # store the values of the weights in case we need to go back
         for t in range(tau):
@@ -89,13 +89,11 @@ def HMC_run(model: keras.models.Model,
             for weight, value in zip(Ws, ws_old):
                 K.set_value(weight, value)
 
-        if i > 1000:
+        if i >= burn_in:
             # burn in
-            if i % 500 == 0:
-                mc_preds += model.predict(x_test)
-                n_mc += 1
+            if i % sample_every == 0:
+                mc_preds.append(model.predict(x_test))
 
-    mc_preds /= n_mc
     if return_extra:
         weights = np.array(weights)
         return mc_preds, losses, weights, accept_n / n_runs
@@ -114,7 +112,7 @@ def HMC(model: keras.models.Model,
         tau,
         burn_in,
         sample_every):
-    mc_preds = None
+    mc_preds = []
 
     for i in range(n_runs):
         print("run: ", i)
@@ -129,13 +127,12 @@ def HMC(model: keras.models.Model,
                                tau,
                                burn_in,
                                sample_every)
-        mc_preds = run_mc_preds if mc_preds is None else mc_preds + run_mc_preds
-    mc_preds /= n_runs
-    return mc_preds
+        mc_preds += run_mc_preds 
+    return np.array(mc_preds) #n_mc x batch_size x n_classes
 
 
 if __name__ == "__main__":
-
+    from matplotlib import pyplot as plt
     from sklearn.datasets import make_classification
     data, labels = make_classification(n_features=2, n_redundant=0)
     labels = labels.reshape(-1, 1)
@@ -150,19 +147,23 @@ if __name__ == "__main__":
                                  input_shape=(2,),
                                  activation='sigmoid',
                                  kernel_regularizer=keras.regularizers.l2()))
+    xx, yy = np.meshgrid(np.linspace(-3,3,100), np.linspace(-3,3,100))
+    plot_x = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
+
     mc_preds = HMC(model,
                    keras.losses.binary_crossentropy,
                    data,
                    labels,
                    plot_x,
-                   10,
-                   15000,
+                   2,
+                   10001,
                    2,
                    1,
                    10000,
-                   1000)
+                   1)
 
     plt.figure()
-    plt.contourf(xx, yy, mc_preds.reshape(xx.shape))
+    plt.contourf(xx, yy, mc_preds.mean(axis=0).reshape(xx.shape))
     plt.scatter(data[:, 0], data[:, 1], c=labels.flatten())
     plt.show()
+
