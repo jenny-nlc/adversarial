@@ -126,7 +126,9 @@ def BALD(mc_preds: tf.Tensor) -> tf.Tensor:
 
 
 def batches_generator(x: np.array, y: np.array, batch_size=100):
-
+    """
+    Yield a generator of batches to iterate easily through a dataset.
+    """
     # todo; maybe add the ability to shuffle?
     N = x.shape[0]
     n_batches = N // batch_size + (N % batch_size != 0)
