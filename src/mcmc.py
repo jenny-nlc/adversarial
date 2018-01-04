@@ -30,6 +30,11 @@ def HMC_run(model: keras.models.Model,
     Caveat Emptor- this takes a *very long time*
     """
     # set up input and output tensors
+    # N.B: this model.input/model.output trick, as well as passing in the lossfn,
+    # is a bit of a hack and only really works on Sequential models. If you want
+    # to adapt this code to be more generic, it might be better to pass in a closure
+    # taking a model and the data and returning the loss and it's gradients, since that
+    # is all the method actually needs, along with the weights.
     X = model.input
     Y_ = model.output
     Y = K.placeholder(shape=Y_.shape)  # to hold the true y_train
