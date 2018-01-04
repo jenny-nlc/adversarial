@@ -29,7 +29,7 @@ data -= data.mean(axis=0)
 data /= data.std(axis=0)
 plt.figure()
 plt.scatter(data[:, 0], data[:, 1], c=labels)
-
+plt.show()
 
 K.set_learning_phase(True)
 weight_decay = 1e-3
@@ -134,7 +134,7 @@ mc_preds = HMC(model,
                x,
                y,
                plot_x,
-               5,
+               10,
                4000,
                5e-3,
                1,
