@@ -14,3 +14,4 @@ sent_to_yarin/*
 env/
 */.ipynb_checkpoints/*
 .nfs*
+overleaf-paper/*
