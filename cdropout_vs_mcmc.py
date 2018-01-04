@@ -21,15 +21,18 @@ from keras.layers import Dense
 from sklearn.datasets import make_classification
 from src.mcmc import HMC
 
+
+        
+    
 N_c = 2  # number of classes
 data, labels = make_classification(
     n_classes=N_c, n_features=2, n_redundant=1, n_informative=1, n_clusters_per_class=1, class_sep=1)
 data[:, 0] = scipy.special.j1(data[:, 0])  # this could be any function really.
 data -= data.mean(axis=0)
 data /= data.std(axis=0)
-plt.figure()
-plt.scatter(data[:, 0], data[:, 1], c=labels)
-plt.show()
+# plt.figure()
+# plt.scatter(data[:, 0], data[:, 1], c=labels)
+
 
 K.set_learning_phase(True)
 weight_decay = 1e-3
@@ -100,7 +103,8 @@ def mk_plots(xx, yy, x, y, probs, entropy, bald):
 
 
 mk_plots(xx, yy, data, labels, plot_probs, plot_entropy, plot_bald)
-plt.savefig('output/dropout_plots.png')
+fname = gen_save_name('output/dropout_plots.png')
+plt.savefig(fname)
 
 
 # now make the sample plots, but using hamiltonian monte carlo samples instead.
@@ -134,15 +138,17 @@ mc_preds = HMC(model,
                x,
                y,
                plot_x,
-               10,
+               15,
                4000,
                5e-3,
                1,
-               2000,
+               3000,
                100)
 
 plot_entropy = entropy(mc_preds.mean(axis=0))
 plot_expected_entropy = entropy(mc_preds).mean(axis=0)
 plot_bald = plot_entropy - plot_expected_entropy
 mk_plots(xx, yy, data, labels, mc_preds.mean(axis=0), plot_entropy, plot_bald)
-plt.savefig('output/mcmc_plots.png')
+
+fname = gen_save_name('output/mcmc_plots.png') 
+plt.savefig(fname)
