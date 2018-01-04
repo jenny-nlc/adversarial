@@ -8,8 +8,18 @@ import itertools as itr
 from functools import reduce
 import operator
 
-# %%
 
+def gen_save_name(basename: str):
+    """
+    Generate a unique name for a saved file to avoid overwrites.
+    """
+    fname, suffix = basename.split('.') #just assume this is true.
+    qualifier = 1
+    unique_fname = fname
+    while(os.path.exists(unique_fname + '.' + suffix)):
+        unique_fname = fname + '_{}'.format(qualifier)
+        qualifier += 1
+    return unique_fname + '.' + suffix
 
 
 def batch_L_norm_distances(X: np.array, Y: np.array, ord=2) -> np.array:
