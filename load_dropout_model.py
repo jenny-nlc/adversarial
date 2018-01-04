@@ -3,11 +3,9 @@ This script trains a model on mnist using concrete dropout. Other than the
 inclusion of concrete dropout, it is identical to the default keras mnist
 example.
 """
-import keras
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv2D, Dense, MaxPooling2D, Flatten
-from keras.models import save_model
 from keras import backend as K
 import src.utilities as U
 from src.concrete_dropout import ConcreteDropout
