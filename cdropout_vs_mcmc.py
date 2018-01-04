@@ -2,19 +2,13 @@
 """
 Compare the predictions of concrete dropout to mcmc integration over network uncertainty
 """
-import tensorflow as tf
 import keras
 import numpy as np
 from matplotlib import pyplot as plt
-from keras.models import load_model, save_model
 from keras import backend as K
-import itertools as itr
-from cleverhans.attacks_tf import fgm
-import os
-import argparse
 import sys
 sys.path.append('..')
-from src.utilities import *
+import src.utilities as U
 import scipy.special
 from src.concrete_dropout import ConcreteDropout
 from keras.layers import Dense
@@ -32,7 +26,6 @@ data -= data.mean(axis=0)
 data /= data.std(axis=0)
 # plt.figure()
 # plt.scatter(data[:, 0], data[:, 1], c=labels)
-
 
 K.set_learning_phase(True)
 weight_decay = 1e-3
@@ -62,8 +55,8 @@ model.fit(x, y, epochs=500)
 n_mc = 50
 
 mc_preds_tensor = mc_dropout_preds(model, inputs, n_mc=n_mc)
-entropy_mean_tensor = predictive_entropy(mc_preds_tensor)
-expected_entropy_tensor = expected_entropy(mc_preds_tensor)
+entropy_mean_tensor = U.predictive_entropy(mc_preds_tensor)
+expected_entropy_tensor = U.expected_entropy(mc_preds_tensor)
 bald_tensor = entropy_mean_tensor - expected_entropy_tensor
 
 get_output = K.function([inputs], [K.mean(mc_preds_tensor, axis=0),
@@ -103,7 +96,7 @@ def mk_plots(xx, yy, x, y, probs, entropy, bald):
 
 
 mk_plots(xx, yy, data, labels, plot_probs, plot_entropy, plot_bald)
-fname = gen_save_name('output/dropout_plots.png')
+fname = U.gen_save_name('output/dropout_plots.png')
 plt.savefig(fname)
 
 
@@ -150,5 +143,6 @@ plot_expected_entropy = entropy(mc_preds).mean(axis=0)
 plot_bald = plot_entropy - plot_expected_entropy
 mk_plots(xx, yy, data, labels, mc_preds.mean(axis=0), plot_entropy, plot_bald)
 
-fname = gen_save_name('output/mcmc_plots.png') 
+fname = U.gen_save_name('output/mcmc_plots.png') 
 plt.savefig(fname)
+
