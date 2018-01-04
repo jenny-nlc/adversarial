@@ -15,3 +15,5 @@ env/
 */.ipynb_checkpoints/*
 .nfs*
 overleaf-paper/*
+tags
+save/*
