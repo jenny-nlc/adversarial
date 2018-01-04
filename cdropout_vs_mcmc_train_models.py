@@ -95,7 +95,7 @@ def train_hmc_model(x,y):
     ensemble_weights = mcmc.HMC_ensemble(model,
                 x,
                 y,
-                N_mc=N_MC, #number of models in the ensemble
+                N_mc=1, #number of models in the ensemble
                 ep=5e-3, #the step size epsilon
                 tau=1, #the number of steps before a metropolis step. I found just one is the fastest (Langevin)
                 burn_in=4000, #the burn in. The normal network converges in <500 epochs so this should be ok.
@@ -112,10 +112,13 @@ if __name__=="__main__":
     data[:, 0] = scipy.special.j1(data[:, 0])  # this could be any function really.
     data -= data.mean(axis=0)
     data /= data.std(axis=0)
-
     x = data
     y = keras.utils.to_categorical(labels)
-
+    
     train_cdropout_model(x,y)
     train_hmc_model(x,y)
-
+    
+    #save toy data.
+    fname = U.gen_save_name('save/toy_dataset.pickle')
+    with open(fname, 'wb') as f:
+        pickle.dump((x,y), f)
