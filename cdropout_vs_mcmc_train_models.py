@@ -17,8 +17,12 @@ import pickle
 
 H_ACT = 'relu'  # anything here really
 N_HIDDEN_UNITS = 500
-WEIGHT_DECAY = 1e-3
-DROPOUT_REGULARIZER = 1e1
+N_DATA = 100
+LENGTH_SCALE = 1
+MODEL_PRECISION = 1e-1
+WEIGHT_DECAY = LENGTH_SCALE ** 2 / (2 * N_DATA * MODEL_PRECISION)
+WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
+DROPOUT_REGULARIZER = 2 / (MODEL_PRECISION * N_DATA)
 N_MC = 50
 N_CLASSES = 2  # number of classes
 
@@ -61,12 +65,6 @@ def define_standard_model():
     return model
 
 
-def entropy(p):
-    """
-    p is a n x n_classes array; return the entropy
-    for each point
-    """
-    return np.sum(- p * np.log(p + 1e-8), axis=-1)
 
 def train_cdropout_model(x, y):
     """
@@ -107,8 +105,8 @@ def train_hmc_model(x,y):
     return 
 
 if __name__=="__main__":
-    data, labels = make_classification(
-        n_classes=N_CLASSES, n_features=2, n_redundant=1, n_informative=1, n_clusters_per_class=1, class_sep=1)
+    data, labels = make_classification(n_samples=N_DATA, n_classes=N_CLASSES, n_features=2,
+                                       n_redundant=1, n_informative=1, n_clusters_per_class=1, class_sep=1)
     data[:, 0] = scipy.special.j1(data[:, 0])  # this could be any function really.
     data -= data.mean(axis=0)
     data /= data.std(axis=0)
