@@ -21,6 +21,18 @@ def gen_save_name(basename: str):
         qualifier += 1
     return unique_fname + '.' + suffix
 
+def create_unique_folder(basepath: str):
+    """
+    Create a unique variation on basepath by appending 1,2,3,...
+    """
+    num = 0
+    path = basepath + repr(num)
+    while(os.path.exists(path)):
+        num += 1
+        path = basepath + repr(num)
+    #path is now a unqie name
+    os.mkdir(path)
+    return path
 
 def batch_L_norm_distances(X: np.array, Y: np.array, ord=2) -> np.array:
     """
