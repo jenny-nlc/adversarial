@@ -14,6 +14,8 @@ from keras.layers import Dense
 from sklearn.datasets import make_classification
 import src.mcmc as mcmc
 import pickle        
+import os
+
 
 H_ACT = 'relu'  # anything here really
 N_HIDDEN_UNITS = 500
@@ -22,6 +24,9 @@ DROPOUT_REGULARIZER = 1e1
 N_MC = 50
 N_CLASSES = 2  # number of classes
 
+#create a unique folder for the output of this script
+
+PATH_NAME = U.create_unique_folder('save/round_')
 def define_cdropout_model():
     """
     Define the cdropout model. This is written as a function for easier loading
@@ -82,7 +87,7 @@ def train_cdropout_model(x, y):
     model.fit(x,y,epochs=500)
     
     #save model weights
-    fname = U.gen_save_name('save/cdropout_toy_model_weights.h5')
+    fname = os.path.join(PATH_NAME,'cdropout_toy_model_weights.h5')
     model.save_weights(fname)
     return
 
@@ -95,13 +100,13 @@ def train_hmc_model(x,y):
     ensemble_weights = mcmc.HMC_ensemble(model,
                 x,
                 y,
-                N_mc=1, #number of models in the ensemble
+                N_mc=N_MC, #number of models in the ensemble
                 ep=5e-3, #the step size epsilon
                 tau=1, #the number of steps before a metropolis step. I found just one is the fastest (Langevin)
                 burn_in=4000, #the burn in. The normal network converges in <500 epochs so this should be ok.
                 samples_per_init=3, #number of times to sample the chain before re-initialising.
                 sample_every=500) #amount of time to run the network before re-sampling
-    fname = U.gen_save_name('save/hmc_ensemble_weights.pickle')
+    fname = os.path.join(PATH_NAME,'hmc_ensemble_weights.pickle')
     with open(fname, 'wb') as f:
         pickle.dump(ensemble_weights, f)
     return 
@@ -119,6 +124,6 @@ if __name__=="__main__":
     train_hmc_model(x,y)
     
     #save toy data.
-    fname = U.gen_save_name('save/toy_dataset.pickle')
+    fname = os.path.join(PATH_NAME,'toy_dataset.pickle')
     with open(fname, 'wb') as f:
         pickle.dump((x,y), f)
