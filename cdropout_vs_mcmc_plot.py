@@ -8,12 +8,20 @@ import src.utilities as U
 from src import mcmc
 import pickle
 import cdropout_vs_mcmc_train_models as C
+import sys
+import os
 
+if len(sys.argv) != 2:
+    sys.exit("Please provide a path to load models from")
 
+LOAD_PATH = sys.argv[1]
+SAVE_PATH = os.path.join('output',LOAD_PATH.replace('/','_')) 
+
+SAVE_PATH = U.create_unique_folder(SAVE_PATH)
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
-plt.rcParams['pdf.plottype'] = 42 
-plt.rcParams['ps.plottype'] = 42 
+plt.rcParams['pdf.fonttype'] = 42 
+plt.rcParams['ps.fonttype'] = 42 
 def entropy(p):
     """
     p is a n x n_classes array; return the entropy
@@ -30,7 +38,7 @@ def mk_plots(xx, yy, x, y, probs, entropy, bald):
     titles = [
         'Decision Boundaries',
         'Predictive Entropy',
-        'log of BALD',
+        'BALD',
         'Probabilty of First Class']
     backcols = [plt.cm.Spectral, plt.cm.gray, plt.cm.gray, plt.cm.viridis]
     axlist = [a for a in ax.flatten()]
@@ -41,7 +49,7 @@ def mk_plots(xx, yy, x, y, probs, entropy, bald):
         ax.set_title(title)
 
 
-with open('save/toy_dataset.pickle', 'rb') as f:
+with open(os.path.join(LOAD_PATH,'toy_dataset.pickle'), 'rb') as f:
     x, y = pickle.load(f)
 
 
@@ -54,13 +62,13 @@ xx, yy = np.meshgrid(np.linspace(x[:, 0].min() -
 
 plot_x = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
 
-def make_cdropout_plots(save=True):
+def make_cdropout_plots(save=False):
     """
     Make plots for the concrete dropout model.
     """
     K.set_learning_phase(True)
     model, inputs = C.define_cdropout_model()
-    model.load_weights('save/cdropout_toy_model_weights.h5')
+    model.load_weights(os.path.join(LOAD_PATH,'cdropout_toy_model_weights.h5'))
 
 
     mc_preds_tensor = U.mc_dropout_preds(model, inputs, n_mc=C.N_MC)
@@ -78,12 +86,12 @@ def make_cdropout_plots(save=True):
 
     mk_plots(xx, yy, x, y, plot_probs, plot_entropy, plot_bald)
     if save:
-        fname = U.gen_save_name('output/cdrop_vs_mcmc/cdropout_plots.png')
+        fname = os.path.join(SAVE_PATH,'cdropout_plots.png')
         plt.savefig(fname)
 
 
 def make_hmc_plots(save=False):
-    with open('save/hmc_ensemble_weights.pickle', 'rb') as f:
+    with open(os.path.join(LOAD_PATH,'hmc_ensemble_weights.pickle'), 'rb') as f:
         hmc_ensemble_weights = pickle.load(f)
 
     hmc_model = C.define_standard_model()
@@ -93,9 +101,9 @@ def make_hmc_plots(save=False):
     plot_bald = plot_entropy - plot_expected_entropy
     mk_plots(xx, yy, x, y, preds, plot_entropy, plot_bald)
     if save:
-        fname = U.gen_save_name('output/cdrop_vs_mcmc/mcmc_plots.png') 
+        fname = os.path.join(SAVE_PATH,'mcmc_plots.png') 
         plt.savefig(fname)
 
 if __name__ == "__main__":
    make_cdropout_plots(save=True) 
-   make_hmc_plot(save=True)
+   make_hmc_plots(save=True)
