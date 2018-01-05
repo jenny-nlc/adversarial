@@ -17,7 +17,7 @@ import pickle
 import os
 
 
-H_ACT = 'relu'  # anything here really
+H_ACT = 'relu'  # Might not be optimal, but a standard choice.
 N_HIDDEN_UNITS = 500
 N_DATA = 100
 LENGTH_SCALE = 1e-2 #setting a low length scale encourages uncertainty to be higher.
@@ -115,7 +115,7 @@ if __name__=="__main__":
     data, labels = make_classification(n_samples=N_DATA, n_classes=N_CLASSES, n_features=2,
                                        n_redundant=n_redundant, n_informative=n_informative,
                                        n_clusters_per_class=1, class_sep=1)
-    if n_informative=1:
+    if n_informative==1:
         data[:, 0] = scipy.special.j1(data[:, 0])  # this could be any function really.
     data -= data.mean(axis=0)
     data /= data.std(axis=0)
