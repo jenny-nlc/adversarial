@@ -109,11 +109,13 @@ def HMC_ensemble( model: keras.models.Model,
     while len(ensemble) < N_mc:
         if verbose: print("run: ", i)
         i += 1 
+        still_todo = N_mc - len(ensemble) 
+        n_samples = samples_per_init if still_todo > samples_per_init else still_todo
         reset_model(model)
         run_ensemble = HMC_ensemble_run(model,
                                x_train,
                                y_train,
-                               samples_per_init,
+                               n_samples,
                                ep,
                                tau,
                                burn_in,
