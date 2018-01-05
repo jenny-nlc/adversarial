@@ -20,8 +20,8 @@ import os
 H_ACT = 'relu'  # anything here really
 N_HIDDEN_UNITS = 500
 N_DATA = 100
-LENGTH_SCALE = 1
-MODEL_PRECISION = 1e-1
+LENGTH_SCALE = 1e-2 #setting a low length scale encourages uncertainty to be higher.
+MODEL_PRECISION = 1e1
 WEIGHT_DECAY = LENGTH_SCALE ** 2 / (2 * N_DATA * MODEL_PRECISION)
 WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
 DROPOUT_REGULARIZER = 2 / (MODEL_PRECISION * N_DATA)
@@ -40,10 +40,10 @@ def define_cdropout_model():
 
     h1 = Dense(N_HIDDEN_UNITS, activation=H_ACT)(inputs)
     h2 = ConcreteDropout(Dense(N_HIDDEN_UNITS, activation=H_ACT),
-                         weight_regularizer=WEIGHT_DECAY,
+                         weight_regularizer=WEIGHT_REGULARIZER,
                          dropout_regularizer=DROPOUT_REGULARIZER)(h1)
     predictions = ConcreteDropout(Dense(N_CLASSES, activation='softmax'),
-                                  weight_regularizer=WEIGHT_DECAY,
+                                  weight_regularizer=WEIGHT_REGULARIZER,
                                   dropout_regularizer=DROPOUT_REGULARIZER)(h2)
     model = keras.models.Model(inputs=inputs, outputs=predictions)
     return model, inputs
@@ -110,9 +110,13 @@ def train_hmc_model(x,y):
     return 
 
 if __name__=="__main__":
+    n_informative = np.random.randint(1,3) #one or two
+    n_redundant = 2 - n_informative
     data, labels = make_classification(n_samples=N_DATA, n_classes=N_CLASSES, n_features=2,
-                                       n_redundant=1, n_informative=1, n_clusters_per_class=1, class_sep=1)
-    data[:, 0] = scipy.special.j1(data[:, 0])  # this could be any function really.
+                                       n_redundant=n_redundant, n_informative=n_informative,
+                                       n_clusters_per_class=1, class_sep=1)
+    if n_informative=1:
+        data[:, 0] = scipy.special.j1(data[:, 0])  # this could be any function really.
     data -= data.mean(axis=0)
     data /= data.std(axis=0)
     x = data
