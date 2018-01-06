@@ -44,7 +44,7 @@ def mk_plots(xx, yy, x, y, probs, entropy, bald):
     axlist = [a for a in ax.flatten()]
     extent = [xx.min(), xx.max(), yy.min(), yy.max()]
     for (ax, field, c, title) in zip(axlist, backgrounds, backcols, titles):
-        ax.imshow(field.reshape(xx.shape).T, cmap=c, origin='lower', extent=extent)
+        ax.imshow(field.reshape(xx.shape), cmap=c, origin='lower', extent=extent)
         ax.scatter(x[:, 0], x[:, 1], c=y.argmax(axis=1), cmap=plt.cm.Set1_r)
         ax.set_title(title)
 
