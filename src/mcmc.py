@@ -129,20 +129,14 @@ def HMC_ensemble_predict(model, ensemble_weights, test_x):
     Given a model and an ensemble of HMC weights, get the average prediction
     of the model
     """
-    cma = None
-    n = 1
+    mc_preds = []
     for ews in ensemble_weights:
         weights = model.weights
         for w, ensemble_value in zip(weights, ews):
             K.set_value(w, ensemble_value)
         preds = model.predict(test_x)
-        if cma is None:
-            cma = preds
-        else:
-            n += 1
-            cma += (preds - cma) / n
-    return cma
-
+        mc_preds.append(preds)
+    return np.array(mc_preds)
 
 
 def HMC_run(model: keras.models.Model,
