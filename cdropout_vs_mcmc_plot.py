@@ -16,8 +16,8 @@ if len(sys.argv) != 2:
 
 LOAD_PATH = sys.argv[1]
 SAVE_PATH = os.path.join('output',LOAD_PATH.replace('/','_')) 
-
-SAVE_PATH = U.create_unique_folder(SAVE_PATH)
+if not os.path.isdir(SAVE_PATH):
+    os.mkdir(SAVE_PATH)
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
 plt.rcParams['pdf.fonttype'] = 42 
@@ -95,7 +95,8 @@ def make_hmc_plots(save=False):
         hmc_ensemble_weights = pickle.load(f)
 
     hmc_model = C.define_standard_model()
-    preds = mcmc.HMC_ensemble_predict(hmc_model, hmc_ensemble_weights, plot_x)
+    mc_preds = mcmc.HMC_ensemble_predict(hmc_model, hmc_ensemble_weights, plot_x)
+    preds = mc_preds.mean(axis=0)
     plot_entropy = entropy(preds)
     plot_expected_entropy = entropy(preds).mean(axis=0)
     plot_bald = plot_entropy - plot_expected_entropy
