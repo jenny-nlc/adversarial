@@ -10,10 +10,15 @@ from keras.layers import Dense, Dropout, Flatten, Lambda, ELU
 from keras.layers import Conv2D
 from keras import backend as K
 
-def get_model(time_len=1):
+def define_model(time_len=1):
+  """ 
+  This is the model definition for the pre-trained comma-ai
+  steering prediction model. It has been changed a little to be up to
+  date with the newer keras API. I couldn't get loading it from the
+  JSON to work properly, but this should be exactly equivalent in any
+  case
   """
-  This needs to be updated to keras 2 for me to be able to load it...
-  """
+
   K.set_image_data_format('channels_first')
   ch, row, col = 3, 160, 320  # camera format
 
