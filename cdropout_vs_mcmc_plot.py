@@ -98,7 +98,7 @@ def make_hmc_plots(save=False):
     mc_preds = mcmc.HMC_ensemble_predict(hmc_model, hmc_ensemble_weights, plot_x)
     preds = mc_preds.mean(axis=0)
     plot_entropy = entropy(preds)
-    plot_expected_entropy = entropy(preds).mean(axis=0)
+    plot_expected_entropy = entropy(mc_preds).mean(axis=0)
     plot_bald = plot_entropy - plot_expected_entropy
     mk_plots(xx, yy, x, y, preds, plot_entropy, plot_bald)
     if save:
