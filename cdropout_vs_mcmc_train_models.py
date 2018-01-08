@@ -21,10 +21,10 @@ H_ACT = 'relu'  # Might not be optimal, but a standard choice.
 N_HIDDEN_UNITS = 500
 N_DATA = 100
 LENGTH_SCALE = 1e-2 #setting a low length scale encourages uncertainty to be higher.
-MODEL_PRECISION = 1e1
+MODEL_PRECISION = 1 #classification problem: see Gal's Thesis
 WEIGHT_DECAY = LENGTH_SCALE ** 2 / (2 * N_DATA * MODEL_PRECISION)
 WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
-DROPOUT_REGULARIZER = 2 / (MODEL_PRECISION * N_DATA)
+DROPOUT_REGULARIZER = 1 / (MODEL_PRECISION * N_DATA)
 N_MC = 50
 N_CLASSES = 2  # number of classes
 
