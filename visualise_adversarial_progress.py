@@ -12,133 +12,107 @@ import cdropout_vs_mcmc_train_models as C
 import src.utilities as U
 from cleverhans.attacks import Attack, FastGradientMethod
 from cleverhans.model import CallableModelWrapper, Model
+from cleverhans import utils_tf
+import tensorflow as tf
 from matplotlib import pyplot as plt
 import src.mcmc as mcmc
 
-#use the basic iterative method. This code is lifted from cleverhans, slightly modified in order
-#to save the intermediate steps of the method.
-class BasicIterativeMethod(Attack):
+
+def fgm_range(x, preds, y=None, epsilons=[0.3], ord=np.inf,
+        clip_min=None, clip_max=None,
+        targeted=False):
     """
-    The Basic Iterative Method (Kurakin et al. 2016). The original paper used
-    hard labels for this attack; no label smoothing.
-    Paper link: https://arxiv.org/pdf/1607.02533.pdf
+    This is a slight modification of the fast gradient method to
+    return a series of fgm attacks with a set of different epilons, in
+    order to avoid the costly recomputation of the gradient.
+    """
+
+    if y is None:
+        # Using model predictions as ground truth to avoid label leaking
+        preds_max = tf.reduce_max(preds, 1, keep_dims=True)
+        y = tf.to_float(tf.equal(preds, preds_max))
+        y = tf.stop_gradient(y)
+    y = y / tf.reduce_sum(y, 1, keep_dims=True)
+
+    # Compute loss
+    loss = utils_tf.model_loss(y, preds, mean=False)
+    if targeted:
+        loss = -loss
+
+    # Define gradient of loss wrt input
+    grad, = tf.gradients(loss, x)
+
+    if ord == np.inf:
+        # Take sign of gradient
+        normalized_grad = tf.sign(grad)
+        # The following line should not change the numerical results.
+        # It applies only because `normalized_grad` is the output of
+        # a `sign` op, which has zero derivative anyway.
+        # It should not be applied for the other norms, where the
+        # perturbation has a non-zero derivative.
+        normalized_grad = tf.stop_gradient(normalized_grad)
+    elif ord == 1:
+        red_ind = list(range(1, len(x.get_shape())))
+        normalized_grad = grad / tf.reduce_sum(tf.abs(grad),
+                                               reduction_indices=red_ind,
+                                               keep_dims=True)
+    elif ord == 2:
+        red_ind = list(range(1, len(x.get_shape())))
+        square = tf.reduce_sum(tf.square(grad),
+                               reduction_indices=red_ind,
+                               keep_dims=True)
+        normalized_grad = grad / tf.sqrt(square)
+    else:
+        raise NotImplementedError("Only L-inf, L1 and L2 norms are "
+                                  "currently implemented.")
+
+    # Multiply by constant epsilon
+    scaled_grads = [eps * normalized_grad for eps in epsilons]
+
+    # Add perturbation to original example to obtain adversarial example
+    adv_xs = [x + scaled_grad for scaled_grad in scaled_grads]
+
+    # If clipping is needed, reset all values outside of [clip_min, clip_max]
+    
+    if (clip_min is not None) and (clip_max is not None):
+        for adx_x in adv_xs:
+            adv_x = tf.clip_by_value(adv_x, clip_min, clip_max)
+
+    return adv_xs
+
+class FastGradientRange(FastGradientMethod):
+    """
+    This is identical to the fast gradient attack in cleverhans,
+    except that I override the generate method to use my modified
+    attack above
     """
     def __init__(self, model, back='tf', sess=None):
-        """
-        Create a BasicIterativeMethod instance.
-        Note: the model parameter should be an instance of the
-        cleverhans.model.Model abstraction provided by CleverHans.
-        """
-        super(BasicIterativeMethod, self).__init__(model, back, sess)
-        self.feedable_kwargs = {'eps': np.float32,
-                                'eps_iter': np.float32,
+        super(FastGradientRange, self).__init__(model, back, sess)
+        self.feedable_kwargs = {'epsilons': np.array, #Iterable[np.float32]
                                 'y': np.float32,
                                 'y_target': np.float32,
                                 'clip_min': np.float32,
                                 'clip_max': np.float32}
-        self.structural_kwargs = ['ord', 'nb_iter']
-
-        if not isinstance(self.model, Model):
-            self.model = CallableModelWrapper(self.model, 'probs')
 
     def generate(self, x, **kwargs):
         """
-        Generate symbolic graph for adversarial examples and return.
-        :param x: The model's symbolic inputs.
-        :param eps: (required float) maximum distortion of adversarial example
-                    compared to original input
-        :param eps_iter: (required float) step size for each attack iteration
-        :param nb_iter: (required int) Number of attack iterations.
-        :param y: (optional) A tensor with the model labels.
-        :param y_target: (optional) A tensor with the labels to target. Leave
-                         y_target=None if y is also set. Labels should be
-                         one-hot-encoded.
-        :param ord: (optional) Order of the norm (mimics Numpy).
-                    Possible values: np.inf, 1 or 2.
-        :param clip_min: (optional float) Minimum input component value
-        :param clip_max: (optional float) Maximum input component value
+        Replace the generate method of the FastGradientMethod class
         """
-        import tensorflow as tf
-
         # Parse and save attack-specific parameters
         assert self.parse_params(**kwargs)
 
-        # Initialize loop variables
-        eta = 0
-        
-        # Fix labels to the first model predictions for loss computation
-        model_preds = self.model.get_probs(x)
-        preds_max = tf.reduce_max(model_preds, 1, keep_dims=True)
-        if self.y_target is not None:
-            y = self.y_target
-            targeted = True
-        elif self.y is not None:
-            y = self.y
-            targeted = False
-        else:
-            y = tf.to_float(tf.equal(model_preds, preds_max))
-            y = tf.stop_gradient(y)
-            targeted = False
+        labels, nb_classes = self.get_or_guess_labels(x, kwargs)
 
-        y_kwarg = 'y_target' if targeted else 'y'
-        fgm_params = {'eps': self.eps_iter, y_kwarg: y, 'ord': self.ord,
-                      'clip_min': self.clip_min, 'clip_max': self.clip_max}
-        steps = [x]
-        for i in range(self.nb_iter):
-            FGM = FastGradientMethod(self.model, back=self.back,
-                                     sess=self.sess)
-            # Compute this step's perturbation
-            eta = FGM.generate(x + eta, **fgm_params) - x
-            # Clipping perturbation eta to self.ord norm ball
-            if self.ord == np.inf:
-                eta = tf.clip_by_value(eta, -self.eps, self.eps)
-            elif self.ord in [1, 2]:
-                reduc_ind = list(range(1, len(eta.get_shape())))
-                if self.ord == 1:
-                    norm = tf.reduce_sum(tf.abs(eta),
-                                         reduction_indices=reduc_ind,
-                                         keep_dims=True)
-                elif self.ord == 2:
-                    norm = tf.sqrt(tf.reduce_sum(tf.square(eta),
-                                                 reduction_indices=reduc_ind,
-                                                 keep_dims=True))
-                eta = eta * self.eps / norm
-
-            steps.append(x + eta) #don't see why this shouldn't work?
-
-        # Define adversarial example (and clip if necessary)
-        adv_x = x + eta
-        if self.clip_min is not None and self.clip_max is not None:
-            adv_x = tf.clip_by_value(adv_x, self.clip_min, self.clip_max)
-
-        return adv_x, steps #these are both tensors
-
-    def parse_params(self, eps=0.3, eps_iter=0.05, nb_iter=10, y=None,
+        return fgm_range(x, self.model.get_probs(x), y=labels, epsilons=self.epsilons,
+                   ord=self.ord, clip_min=self.clip_min,
+                   clip_max=self.clip_max,
+                   targeted=(self.y_target is not None))
+    
+    def parse_params(self, epsilons=[0.3],  y=None,
                      ord=np.inf, clip_min=None, clip_max=None,
                      y_target=None, **kwargs):
-        """
-        Take in a dictionary of parameters and applies attack-specific checks
-        before saving them as attributes.
-
-        Attack-specific parameters:
-        :param eps: (required float) maximum distortion of adversarial example
-                    compared to original input
-        :param eps_iter: (required float) step size for each attack iteration
-        :param nb_iter: (required int) Number of attack iterations.
-        :param y: (optional) A tensor with the model labels.
-        :param y_target: (optional) A tensor with the labels to target. Leave
-                         y_target=None if y is also set. Labels should be
-                         one-hot-encoded.
-        :param ord: (optional) Order of the norm (mimics Numpy).
-                    Possible values: np.inf, 1 or 2.
-        :param clip_min: (optional float) Minimum input component value
-        :param clip_max: (optional float) Maximum input component value
-        """
-
         # Save attack-specific parameters
-        self.eps = eps
-        self.eps_iter = eps_iter
-        self.nb_iter = nb_iter
+        self.epsilons = epsilons
         self.y = y
         self.y_target = y_target
         self.ord = ord
@@ -153,14 +127,65 @@ class BasicIterativeMethod(Attack):
 
         return True
 
-def generate_plot(model_wrapper,data, x, nb_iter=10, eps=1, eps_iter=.1):
+def generate_path_plots(model_wrapper,
+                        model_entropy, # numpy array -> scalar
+                        model_bald,    # numpy array -> scalar
+                        data, x, epsilons):
+    """
+    Plot the bald and entropy of a single point becoming more and more adversarial
+    """
+    fgr = FastGradientRange(model_wrapper, sess=K.get_session())
+
+    input_tensor = K.placeholder(shape=(None,2))
+    adv_steps = fgr.generate(input_tensor, epsilons = epsilons, ord = 2)
+
+    steps = [s.eval(session=K.get_session(), feed_dict={input_tensor: x}) for s in adv_steps]
+    steps = np.array(steps).squeeze()
+
+    entropies = model_entropy([steps])[0] 
+    balds     = model_bald([steps])[0]
+    plt.figure()
+    plt.plot(entropies)
+    plt.title('Predictive Entropy')
+    plt.xlabel('Epsilon')
+    plt.ylabel('Entropy')
+
+
+    plt.figure()
+    plt.plot(balds)
+    plt.title('BALD Score')
+    plt.xlabel('Epsilon')
+    plt.ylabel('BALD')
+
+    plt.figure()
+    xx,yy = np.meshgrid(np.linspace(-3,3,100),np.linspace(-3,3,100))
+    X = np.concatenate([xx.reshape(-1,1), yy.reshape(-1,1)], axis=1)
+    preds = model_wrapper(input_tensor).eval(session=K.get_session(), feed_dict={input_tensor: X})
+    #bald  = get_bald(input_tensor).eval(session=K.get_session(), feed_dict={input_tensor: X})
+    #TODO: maybe add this capability later? 
+
+    plt.imshow((preds[:,0].reshape(xx.shape) + 1e-6),
+            cmap='gray',
+            origin='lower',
+            interpolation='bicubic',
+            extent=[xx.min(),
+                    xx.max(),
+                    yy.min(),
+                    yy.max()])
+    plt.scatter(data[:,0], data[:,1], c=labels.argmax(axis=1))
+    plt.plot(steps[:,0], steps[:,1], marker='+')
+
+
+
+    
+def generate_many_plot(model_wrapper,data, x, epsilons):
     """
     Generate the plot with data data for points x
     """
-    
-    bim = BasicIterativeMethod(model_wrapper, sess=K.get_session())
+    fgr = FastGradientRange(model_wrapper, sess=K.get_session())
+
     input_tensor = K.placeholder(shape=(None,2))
-    adv_end, adv_steps = bim.generate(input_tensor, eps = eps, nb_iter = nb_iter, eps_iter = eps_iter, ord = 2)
+    adv_steps = fgr.generate(input_tensor, epsilons = epsilons, ord = 2)
 
     steps = [s.eval(session=K.get_session(), feed_dict={input_tensor: x}) for s in adv_steps]
     steps = np.array(steps).squeeze()
@@ -189,13 +214,25 @@ def generate_plot(model_wrapper,data, x, nb_iter=10, eps=1, eps_iter=.1):
 model, model_inputs = C.define_cdropout_model()
 model.load_weights('server_output/toy_models/round_5/cdropout_toy_model_weights.h5')
 data,labels = pickle.load(open('server_output/toy_models/round_5/toy_dataset.pickle', 'rb'))
-hmc_model = C.define_standard_model()
-hmc_weights = pickle.load(open('server_output/toy_models/round_5/hmc_ensemble_weights.pickle', 'rb'))
 #define a closure for keras to use as a wrapper
 def mc_keras_model(x):
     return K.mean(U.mc_dropout_preds(model, x, n_mc=C.N_MC), axis=0)
-def get_bald(x):
-    return U.BALD(U.mc_dropout_preds(model, x, n_mc=C.N_MC))
+def get_closures():
+    input_tensor = K.placeholder(shape=(None,2))
+    mc_preds = U.mc_dropout_preds(model, input_tensor, n_mc=C.N_MC)
+    pred_H = U.predictive_entropy(mc_preds)
+    exp_H  = U.expected_entropy(mc_preds)
+
+    get_entropy = K.function([input_tensor], [pred_H])
+    get_bald    = K.function([input_tensor], [pred_H - exp_H])
+
+    return get_entropy, get_bald
+
+e, b = get_closures()
+generate_path_plots(CallableModelWrapper(mc_keras_model, 'probs'),e,b, data, data[5:6], epsilons = np.linspace(0,2,10))
+
+
+hmc_weights = pickle.load(open('server_output/toy_models/round_5/hmc_ensemble_weights.pickle', 'rb'))
 
 class HMCKerasModel:
     """
@@ -212,8 +249,21 @@ class HMCKerasModel:
         self.ensemble = ensemble
     def __call__(self,x):
         return K.mean(K.stack([model(x) for model in self.ensemble]), axis=0) 
+    def generate_closures(self):
+        input_tensor = K.placeholder(shape=(None,2))
+        mc_preds = K.stack([model(input_tensor) for model in self.ensemble])
+        pred_H = U.predictive_entropy(mc_preds)
+        exp_H  = U.expected_entropy(mc_preds)
+
+        get_entropy = K.function([input_tensor], [pred_H])
+        get_bald    = K.function([input_tensor], [pred_H - exp_H])
+
+        return get_entropy, get_bald
+
+       
 
 hmc_model = HMCKerasModel()
 wrapper = CallableModelWrapper(hmc_model,'probs')
-generate_plot(wrapper, data, data[:20], eps=.5, nb_iter=5,eps_iter=0.1) 
+e,b = hmc_model.generate_closures()
+generate_path_plots(wrapper, e,b,data, data[5:6], epsilons=np.linspace(0,3,10)) 
 plt.show()
