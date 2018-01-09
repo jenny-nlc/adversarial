@@ -17,3 +17,5 @@ env/
 overleaf-paper/*
 tags
 save/*
+*~
+*#
