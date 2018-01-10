@@ -11,7 +11,7 @@ import src.utilities as U
 import scipy.special
 from src.concrete_dropout import ConcreteDropout
 from keras.layers import Dense
-from sklearn.datasets import make_classification
+from sklearn.datasets import make_classification, make_moons
 import src.mcmc as mcmc
 import pickle        
 import os
@@ -71,25 +71,28 @@ def define_standard_model():
 
 
 
-def train_cdropout_model(x, y):
+def train_cdropout_model(x, y, save=False):
     """
-    Define and train the cdropout model, also saveing it for later use
+    Define and train the cdropout model, also saving it for later use
     """
     K.set_learning_phase(True)
     model,_ = define_cdropout_model()
 
     model.compile(
-        optimizer='sgd',
+        optimizer=keras.optimizers.SGD(lr=0.05, momentum=0.1, decay=0.0001,nesterov=True),
         loss=keras.losses.categorical_crossentropy,
         metrics=['accuracy'])
     model.fit(x,y,epochs=500)
     
     #save model weights
-    fname = os.path.join(PATH_NAME,'cdropout_toy_model_weights.h5')
-    model.save_weights(fname)
-    return
+    if save:
+        fname = os.path.join(PATH_NAME,'cdropout_toy_model_weights.h5')
+        model.save_weights(fname)
+        return
+    else:
+        return model
 
-def train_hmc_model(x,y):
+def train_hmc_model(x,y, save=False):
     model = define_standard_model()
     model.compile(optimizer='sgd', loss = keras.losses.categorical_crossentropy,metrics=['accuracy'])
      # N.B: this line does basically nothing because the hmc code doesn't use the optimizer, it's
@@ -99,17 +102,20 @@ def train_hmc_model(x,y):
                 x,
                 y,
                 N_mc=N_MC, #number of models in the ensemble
-                ep=5e-3, #the step size epsilon
-                tau=1, #the number of steps before a metropolis step. I found just one is the fastest (Langevin)
+                ep=1e-3, #the step size epsilon
+                tau=10, #the number of steps before a metropolis step. I found just one is the fastest (Langevin)
                 burn_in=4000, #the burn in. The normal network converges in <500 epochs so this should be ok.
                 samples_per_init=3, #number of times to sample the chain before re-initialising.
                 sample_every=500) #amount of time to run the network before re-sampling
-    fname = os.path.join(PATH_NAME,'hmc_ensemble_weights.pickle')
-    with open(fname, 'wb') as f:
-        pickle.dump(ensemble_weights, f)
-    return 
+    if save:
+        fname = os.path.join(PATH_NAME,'hmc_ensemble_weights.pickle')
+        with open(fname, 'wb') as f:
+            pickle.dump(ensemble_weights, f)
+        return
+    else:
+        return model 
 
-if __name__=="__main__":
+def make_random_classification():
     n_informative = np.random.randint(1,3) #one or two
     n_redundant = 2 - n_informative
     data, labels = make_classification(n_samples=N_DATA, n_classes=N_CLASSES, n_features=2,
@@ -121,9 +127,14 @@ if __name__=="__main__":
     data /= data.std(axis=0)
     x = data
     y = keras.utils.to_categorical(labels)
-    
-    train_cdropout_model(x,y)
-    train_hmc_model(x,y)
+    return x,y
+
+if __name__=="__main__":
+    #x,y = make_random_classification()
+    x,y = make_moons(noise = 0.1) 
+    y = keras.utils.to_categorical(y)
+    train_cdropout_model(x,y, save=True)
+    train_hmc_model(x,y, save=True)
     
     #save toy data.
     fname = os.path.join(PATH_NAME,'toy_dataset.pickle')
