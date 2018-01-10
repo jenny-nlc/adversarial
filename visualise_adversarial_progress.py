@@ -16,7 +16,13 @@ from cleverhans import utils_tf
 import tensorflow as tf
 from matplotlib import pyplot as plt
 import src.mcmc as mcmc
+import os
 
+
+
+plt.rcParams['figure.figsize'] = 10,4
+plt.rcParams['pdf.fonttype'] = 42 
+plt.rcParams['ps.fonttype'] = 42 
 
 def fgm_range(x, preds, y=None, epsilons=[0.3], ord=np.inf,
         clip_min=None, clip_max=None,
@@ -144,27 +150,26 @@ def generate_path_plots(model_wrapper,
 
     entropies = model_entropy([steps])[0] 
     balds     = model_bald([steps])[0]
-    plt.figure()
-    plt.plot(entropies)
-    plt.title('Predictive Entropy')
-    plt.xlabel('Epsilon')
-    plt.ylabel('Entropy')
+    f, axes = plt.subplots(1,3)
+
+    axes[0].plot(entropies)
+    axes[0].set_title('Predictive Entropy')
+    axes[0].set_xlabel('Epsilon')
+    axes[0].set_ylabel('Entropy')
 
 
-    plt.figure()
-    plt.plot(balds)
-    plt.title('BALD Score')
-    plt.xlabel('Epsilon')
-    plt.ylabel('BALD')
+    axes[1].plot(balds)
+    axes[1].set_title('BALD Score')
+    axes[1].set_xlabel('Epsilon')
+    axes[1].set_ylabel('BALD')
 
-    plt.figure()
     xx,yy = np.meshgrid(np.linspace(-3,3,100),np.linspace(-3,3,100))
     X = np.concatenate([xx.reshape(-1,1), yy.reshape(-1,1)], axis=1)
     preds = model_wrapper(input_tensor).eval(session=K.get_session(), feed_dict={input_tensor: X})
     #bald  = get_bald(input_tensor).eval(session=K.get_session(), feed_dict={input_tensor: X})
     #TODO: maybe add this capability later? 
 
-    plt.imshow((preds[:,0].reshape(xx.shape) + 1e-6),
+    axes[2].imshow((preds[:,0].reshape(xx.shape) + 1e-6),
             cmap='gray',
             origin='lower',
             interpolation='bicubic',
@@ -172,9 +177,9 @@ def generate_path_plots(model_wrapper,
                     xx.max(),
                     yy.min(),
                     yy.max()])
-    plt.scatter(data[:,0], data[:,1], c=labels.argmax(axis=1))
-    plt.plot(steps[:,0], steps[:,1], marker='+')
-
+    axes[2].scatter(data[:,0], data[:,1], c=labels.argmax(axis=1))
+    axes[2].plot(steps[:,0], steps[:,1], marker='+')
+    return f
 
 
     
@@ -209,38 +214,13 @@ def generate_many_plot(model_wrapper,data, x, epsilons):
     for i in range(len(x)):
         plt.plot(steps[:,i,0], steps[:,i,1], marker='+')
 
-
-#test on a random-ish model for know
-model, model_inputs = C.define_cdropout_model()
-model.load_weights('server_output/toy_models/round_5/cdropout_toy_model_weights.h5')
-data,labels = pickle.load(open('server_output/toy_models/round_5/toy_dataset.pickle', 'rb'))
-#define a closure for keras to use as a wrapper
-def mc_keras_model(x):
-    return K.mean(U.mc_dropout_preds(model, x, n_mc=C.N_MC), axis=0)
-def get_closures():
-    input_tensor = K.placeholder(shape=(None,2))
-    mc_preds = U.mc_dropout_preds(model, input_tensor, n_mc=C.N_MC)
-    pred_H = U.predictive_entropy(mc_preds)
-    exp_H  = U.expected_entropy(mc_preds)
-
-    get_entropy = K.function([input_tensor], [pred_H])
-    get_bald    = K.function([input_tensor], [pred_H - exp_H])
-
-    return get_entropy, get_bald
-
-e, b = get_closures()
-generate_path_plots(CallableModelWrapper(mc_keras_model, 'probs'),e,b, data, data[5:6], epsilons = np.linspace(0,2,10))
-
-
-hmc_weights = pickle.load(open('server_output/toy_models/round_5/hmc_ensemble_weights.pickle', 'rb'))
-
 class HMCKerasModel:
     """
     The wrapper I wrote in the mcmc function returns a numpy array; if we
     want to differentiate the output of our model, we need to insantiate it
     in keras
     """
-    def __init__(self):
+    def __init__(self, weights):
         ensemble = []
         for ws in hmc_weights:
             model = C.define_standard_model()
@@ -260,10 +240,35 @@ class HMCKerasModel:
 
         return get_entropy, get_bald
 
+LOAD_PATH='server_output/toy_models/round_6'
+#test on a random-ish model for know
+model, model_inputs = C.define_cdropout_model()
+model.load_weights(os.path.join(LOAD_PATH,'cdropout_toy_model_weights.h5'))
+data,labels = pickle.load(open(os.path.join(LOAD_PATH,'toy_dataset.pickle'), 'rb'))
+#define a closure for keras to use as a wrapper
+def mc_keras_model(x):
+    return K.mean(U.mc_dropout_preds(model, x, n_mc=C.N_MC), axis=0)
+def get_closures():
+    input_tensor = K.placeholder(shape=(None,2))
+    mc_preds = U.mc_dropout_preds(model, input_tensor, n_mc=C.N_MC)
+    pred_H = U.predictive_entropy(mc_preds)
+    exp_H  = U.expected_entropy(mc_preds)
+
+    get_entropy = K.function([input_tensor], [pred_H])
+    get_bald    = K.function([input_tensor], [pred_H - exp_H])
+
+    return get_entropy, get_bald
+
+epsilons = np.linspace(0,1.5,10)
+e, b = get_closures()
+f1 = generate_path_plots(CallableModelWrapper(mc_keras_model, 'probs'),e,b, data, data[5:6], epsilons = epsilons)
+
+hmc_weights = pickle.load(open(os.path.join(LOAD_PATH, 'hmc_ensemble_weights.pickle'), 'rb'))
+
        
 
-hmc_model = HMCKerasModel()
+hmc_model = HMCKerasModel(hmc_weights)
 wrapper = CallableModelWrapper(hmc_model,'probs')
 e,b = hmc_model.generate_closures()
-generate_path_plots(wrapper, e,b,data, data[5:6], epsilons=np.linspace(0,3,10)) 
-plt.show()
+f2 = generate_path_plots(wrapper, e,b,data, data[5:6], epsilons=epsilons) 
+ o
