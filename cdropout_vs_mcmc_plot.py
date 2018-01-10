@@ -33,14 +33,16 @@ def entropy(p):
 def mk_plots(xx, yy, x, y, probs, entropy, bald):
     decision = probs.argmax(axis=1)
 
-    f, ax = plt.subplots(2, 2)
-    backgrounds = [decision, entropy, bald, probs[:, 1]]
+    f, ax = plt.subplots(3, 2)
+    backgrounds = [decision, entropy, bald, probs[:, 1], np.log(bald + 1e-6)]
     titles = [
         'Decision Boundaries',
         'Predictive Entropy',
         'BALD',
-        'Probabilty of First Class']
-    backcols = [plt.cm.Spectral, plt.cm.gray, plt.cm.gray, plt.cm.viridis]
+        'Probabilty of First Class',
+        'Log of BALD',
+    ]
+    backcols = [plt.cm.Spectral, plt.cm.gray, plt.cm.gray, plt.cm.viridis, plt.cm.gray]
     axlist = [a for a in ax.flatten()]
     extent = [xx.min(), xx.max(), yy.min(), yy.max()]
     for (ax, field, c, title) in zip(axlist, backgrounds, backcols, titles):
@@ -53,7 +55,7 @@ with open(os.path.join(LOAD_PATH,'toy_dataset.pickle'), 'rb') as f:
     x, y = pickle.load(f)
 
 
-around = 5
+around = 3
 xx, yy = np.meshgrid(np.linspace(x[:, 0].min() -
                                  around, x[:, 0].max() +
                                  around, 100), np.linspace(x[:, 1].min() -
@@ -85,6 +87,7 @@ def make_cdropout_plots(save=False):
     plot_probs, plot_entropy, plot_bald = get_output([plot_x])
 
     mk_plots(xx, yy, x, y, plot_probs, plot_entropy, plot_bald)
+    
     if save:
         fname = os.path.join(SAVE_PATH,'cdropout_plots.png')
         plt.savefig(fname)
