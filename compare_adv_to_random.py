@@ -14,7 +14,7 @@ from visualise_adversarial_progress import FastGradientRange
 from matplotlib import pyplot as plt
 from cleverhans.model import CallableModelWrapper
 
-
+np.random.randn
 
 H_ACT = 'relu'  # Might not be optimal, but a standard choice.
 N_HIDDEN_UNITS = 500
@@ -33,6 +33,11 @@ ORD = 2
 N_SAMPLES = 1500
 TRAIN_SPLIT = 0.9
 N_INFORMATIVE=10
+plt.rcParams['figure.figsize'] = 8, 8
+#use true type fonts only
+plt.rcParams['pdf.fonttype'] = 42 
+plt.rcParams['ps.fonttype'] = 42 
+
 def define_cdropout_model():
     """
     Define the cdropout model. This is written as a function for easier loading
@@ -96,12 +101,12 @@ if __name__ == "__main__":
         loss = keras.losses.categorical_crossentropy,
         metrics=['accuracy']
         )
-    model.fit(x_train,y_train,epochs=150, validation_data =(x_test,y_test))
+    model.fit(x_train,y_train,epochs=100, validation_data =(x_test,y_test))
     mc_model = MCModel(model, input_tensor, 50)
 
     fgr = FastGradientRange(CallableModelWrapper(mc_model,'probs'), sess=K.get_session())
 
-    epsilons = np.linspace(0,1,20)
+    epsilons = np.linspace(0,2,50)
     adv_steps = fgr.generate(input_tensor, epsilons=epsilons, ord=ORD) 
 
     advs = [s.eval(session=K.get_session(), feed_dict={input_tensor: x_test}) for s in adv_steps]
@@ -138,31 +143,28 @@ if __name__ == "__main__":
     rnd_entropies = np.array(rnd_entropies)
     rnd_balds = np.array(rnd_balds)
 
-    plt.figure()
-    plt.plot(epsilons,adv_balds.mean(axis=1), c='b', label='Adversarial Direction')
-    plt.plot(epsilons,rnd_balds.mean(axis=1), c='r', label='Random Direction')
-    plt.title('BALD / epsilon')
-    plt.xlabel('Step size ({} norm)'.format(ORD))
-    plt.ylabel('Average BALD')
-    plt.legend()
+    fig, axes = plt.subplots(3,1)
 
-    plt.figure()
-    plt.plot(epsilons,adv_entropies.mean(axis=1), c='b', label='Adversarial Direction')
-    plt.plot(epsilons,rnd_entropies.mean(axis=1), c='r', label='Random Direction')
-    plt.title('Entropy / epsilon')
-    plt.xlabel('Step size ({} norm)'.format(ORD))
-    plt.ylabel('Average Entropy')
-    plt.legend()
+    axes[0].plot(epsilons,adv_balds.mean(axis=1), c='b', label='Adversarial Direction')
+    axes[0].plot(epsilons,rnd_balds.mean(axis=1), c='r', label='Random Direction')
+    axes[0].set_xlabel('Step size ({} norm)'.format(ORD))
+    axes[0].set_ylabel('Average BALD')
+    axes[0].legend()
+
+    axes[1].plot(epsilons,adv_entropies.mean(axis=1), c='b', label='Adversarial Direction')
+    axes[1].plot(epsilons,rnd_entropies.mean(axis=1), c='r', label='Random Direction')
+    axes[1].set_xlabel('Step size ({} norm)'.format(ORD))
+    axes[1].set_ylabel('Average Entropy')
+    axes[1].legend()
 
     #calculate accuracy
     adv_accs = np.equal(adv_preds.argmax(axis=-1), y_test.argmax(axis=1)[None,:]).astype(np.float).mean(axis=1)
     rnd_accs = np.equal(rnd_preds.argmax(axis=-1), y_test.argmax(axis=1)[None,:]).astype(np.float).mean(axis=1)
 
-    plt.figure()
-    plt.plot(epsilons,adv_accs, c='b', label='Adversarial Direction')
-    plt.plot(epsilons,rnd_accs, c='r', label='Random Direction')
-    plt.title('Accuracy/ epsilon')
-    plt.xlabel('Step size ({} norm)'.format(ORD))
-    plt.legend()
-    plt.ylabel('Average Accuracy')
+    axes[2].plot(epsilons,adv_accs, c='b', label='Adversarial Direction')
+    axes[2].plot(epsilons,rnd_accs, c='r', label='Random Direction')
+    axes[2].set_xlabel('Step size ({} norm)'.format(ORD))
+    axes[2].legend()
+    axes[2].set_ylabel('Average Accuracy')
+
     plt.show()
