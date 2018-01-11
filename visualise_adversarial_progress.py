@@ -271,4 +271,4 @@ hmc_model = HMCKerasModel(hmc_weights)
 wrapper = CallableModelWrapper(hmc_model,'probs')
 e,b = hmc_model.generate_closures()
 f2 = generate_path_plots(wrapper, e,b,data, data[5:6], epsilons=epsilons) 
- o
+
