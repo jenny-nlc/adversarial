@@ -14,7 +14,6 @@ from visualise_adversarial_progress import FastGradientRange
 from matplotlib import pyplot as plt
 from cleverhans.model import CallableModelWrapper
 
-np.random.randn
 
 H_ACT = 'relu'  # Might not be optimal, but a standard choice.
 N_HIDDEN_UNITS = 500
@@ -54,26 +53,6 @@ def define_cdropout_model():
                                   dropout_regularizer=DROPOUT_REGULARIZER)(h2)
     model = keras.models.Model(inputs=inputs, outputs=predictions)
     return model, inputs
-
-class MCModel:
-    def __init__(self,model, input_tensor, n_mc):
-        self.model = model
-        self.input = input_tensor
-        self.n_mc=n_mc
-        self.mc_preds_t = U.mc_dropout_preds(self.model, self.input, n_mc=n_mc)
-        self.predictive_entropy_t = U.predictive_entropy(self.mc_preds_t)
-        self.expected_entropy_t   = U.expected_entropy(self.mc_preds_t)
-        self.bald_t = self.predictive_entropy_t - self.expected_entropy_t
-
-    def get_results(self,x):
-        f = K.function([self.input],
-                       [K.mean(self.mc_preds_t, axis=0),
-                        self.predictive_entropy_t, self.bald_t])
-        return f([x])
-    def predict(self, x):
-        return self.get_results(x)[0]
-    def __call__(self, x):
-        return K.mean(U.mc_dropout_preds(self.model, x, n_mc = self.n_mc), axis=0)
 if __name__ == "__main__":
 
     x,y = make_classification(n_classes = N_CLASSES,
@@ -102,7 +81,7 @@ if __name__ == "__main__":
         metrics=['accuracy']
         )
     model.fit(x_train,y_train,epochs=100, validation_data =(x_test,y_test))
-    mc_model = MCModel(model, input_tensor, 50)
+    mc_model = U.MCModel(model, input_tensor, 50)
 
     fgr = FastGradientRange(CallableModelWrapper(mc_model,'probs'), sess=K.get_session())
 

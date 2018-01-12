@@ -8,6 +8,25 @@ import itertools as itr
 from functools import reduce
 import operator
 
+class MCModel:
+    def __init__(self,model, input_tensor, n_mc):
+        self.model = model
+        self.input = input_tensor
+        self.n_mc=n_mc
+        self.mc_preds_t = mc_dropout_preds(self.model, self.input, n_mc=n_mc)
+        self.predictive_entropy_t = predictive_entropy(self.mc_preds_t)
+        self.expected_entropy_t   = expected_entropy(self.mc_preds_t)
+        self.bald_t = self.predictive_entropy_t - self.expected_entropy_t
+
+    def get_results(self,x):
+        f = K.function([self.input],
+                       [K.mean(self.mc_preds_t, axis=0),
+                        self.predictive_entropy_t, self.bald_t])
+        return f([x])
+    def predict(self, x):
+        return self.get_results(x)[0]
+    def __call__(self, x):
+        return K.mean(mc_dropout_preds(self.model, x, n_mc = self.n_mc), axis=0)
 
 def gen_save_name(basename: str):
     """
@@ -30,7 +49,7 @@ def create_unique_folder(basepath: str):
     while(os.path.exists(path)):
         num += 1
         path = basepath + repr(num)
-    #path is now a unqie name
+    #path is now a unquie name
     os.mkdir(path)
     return path
 
@@ -116,7 +135,7 @@ def mc_dropout_preds(model, x: tf.Tensor, n_mc: int) -> tf.Tensor:
 
 
 def entropy(X: tf.Tensor) -> tf.Tensor:
-    return K.sum(- X * K.log(K.clip(X, 1e-10, 1)), axis=-1)
+    return K.sum(- X * K.log(K.clip(X, 1e-6, 1)), axis=-1)
 
 
 def expected_entropy(mc_preds: tf.Tensor) -> tf.Tensor:
