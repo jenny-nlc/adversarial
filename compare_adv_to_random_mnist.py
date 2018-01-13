@@ -17,6 +17,7 @@ import pickle
 import os
 
 import tensorflow as tf
+import argparse
 
 def fgm_grad(x, preds, y=None, ord=np.inf,
         clip_min=None, clip_max=None,
@@ -135,7 +136,9 @@ def eval_perturbations(perturbations, mc_model, batch_size=256):
     preds = []
     entropies = []
     balds = []
-    for a in perturbations:
+    N = len(perturbations)
+    for i,a in enumerate(perturbations):
+        print('Eps {} of {}'.format(i,N))
         zipres = [mc_model.get_results(x) for x in batch_gen(a, batch_size=batch_size)] 
         bpred = np.concatenate([x[0] for x in zipres]) 
         bentropy = np.concatenate([x[1] for x in zipres])
@@ -155,17 +158,41 @@ def batch_gen(array, batch_size=256):
     return (array[i*bs:(i+1)*bs] for i in range(n_batches))
 
 if __name__ == '__main__':
-    
-    batch_size = 20
-    ORD = np.inf 
-    epsilons = np.linspace(0,1,40)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--eps_min', type=float, default=0, help="Minimum value \
+        of epsilon to generate adverserial examples with FGM")
+    parser.add_argument('--eps_max', type=float, default=1, help="Max value of \
+        epsilon to generate adverserial examples with")
+    parser.add_argument('--N_eps', type=float, default=50, help="Number of values \
+        of epsilon to use (linspace eps_min eps_max)")
+    parser.add_argument('--N_data', type=int, default=100, help="Number of examples \
+        from the test set to use")
+    parser.add_argument('--norm', default='inf', help="which norm to use: \
+        currently <- {1,2,inf}")
+    parser.add_argument('--N_mc', default=50, type=int, help="Number of MC forward \
+        passes to use.")
+    parser.add_argument('--batch_size', default=100, type=int, help='batch size')
+    args = parser.parse_args()
+
+    if args.norm == 'inf':
+        ORD = np.inf
+    elif args.norm == '1':
+        ORD = 1
+    elif args.norm == '2':
+        ORD = 2
+    else:
+        raise NotImplementedError("Norms other than 1,2, inf not implemented")
+
+    batch_size=args.batch_size
+    epsilons = np.linspace(args.eps_min, args.eps_max, args.N_eps)
 
 
     x_train, y_train, x_test, y_test = U.get_mnist()
-    x_test = x_test[:50]     
+    x_test = x_test[:args.N_data]
+    y_test = y_test[:args.N_data]
     model = load_model()
     input_tensor = model.input
-    mc_model = U.MCModel(model, input_tensor, n_mc = 50 )
+    mc_model = U.MCModel(model, input_tensor, n_mc = args.N_mc )
 
     fg = FastGrad(CallableModelWrapper(mc_model, 'probs'), sess=K.get_session())
 
@@ -177,6 +204,7 @@ if __name__ == '__main__':
 
     advs = [x_test + ep * adv_etas for ep in epsilons]
     advs = np.clip(advs, 0,1)
+    print('Calculating adversarial pertubations...')
     adv_preds, adv_entropies, adv_balds = eval_perturbations(advs, mc_model, batch_size=batch_size) 
      
     
@@ -192,9 +220,10 @@ if __name__ == '__main__':
     perturbs = [x_test + ep * eta for ep in epsilons]
     perturbs = np.clip(perturbs, 0, 1)
 
+    print('Calculating random pertubations...')
     rnd_preds, rnd_entropies, rnd_balds = eval_perturbations(perturbs, mc_model, batch_size=batch_size)
 
-    save_path = U.create_unique_folder(os.path.join('save', 'mnist_pertubations'))
+    save_path = U.create_unique_folder(os.path.join('save', 'mnist_pertubations_{}_norm_run_'.format(ORD)))
 
     with open(os.path.join(save_path, 'mnist_pertub_data.pickle'),'wb') as f:
         pickle.dump([epsilons,
@@ -204,6 +233,6 @@ if __name__ == '__main__':
                      rnd_preds,
                      rnd_entropies,
                      rnd_balds], f)
-    with open(os.path.join(save_path, 'mnist_data.pickle'), 'wb') as f:
-        pickle.dump((x_train, y_train, x_test, y_test), f)
+    with open(os.path.join(save_path, 'mnist_sample.pickle'), 'wb') as f:
+        pickle.dump((x_test, y_test), f)
         
