@@ -239,36 +239,36 @@ class HMCKerasModel:
         get_bald    = K.function([input_tensor], [pred_H - exp_H])
 
         return get_entropy, get_bald
+if __name__ == '__main__':
+    LOAD_PATH='server_output/toy_models/round_6'
+    #test on a random-ish model for know
+    model, model_inputs = C.define_cdropout_model()
+    model.load_weights(os.path.join(LOAD_PATH,'cdropout_toy_model_weights.h5'))
+    data,labels = pickle.load(open(os.path.join(LOAD_PATH,'toy_dataset.pickle'), 'rb'))
+    #define a closure for keras to use as a wrapper
+    def mc_keras_model(x):
+        return K.mean(U.mc_dropout_preds(model, x, n_mc=C.N_MC), axis=0)
+    def get_closures():
+        input_tensor = K.placeholder(shape=(None,2))
+        mc_preds = U.mc_dropout_preds(model, input_tensor, n_mc=C.N_MC)
+        pred_H = U.predictive_entropy(mc_preds)
+        exp_H  = U.expected_entropy(mc_preds)
 
-LOAD_PATH='server_output/toy_models/round_6'
-#test on a random-ish model for know
-model, model_inputs = C.define_cdropout_model()
-model.load_weights(os.path.join(LOAD_PATH,'cdropout_toy_model_weights.h5'))
-data,labels = pickle.load(open(os.path.join(LOAD_PATH,'toy_dataset.pickle'), 'rb'))
-#define a closure for keras to use as a wrapper
-def mc_keras_model(x):
-    return K.mean(U.mc_dropout_preds(model, x, n_mc=C.N_MC), axis=0)
-def get_closures():
-    input_tensor = K.placeholder(shape=(None,2))
-    mc_preds = U.mc_dropout_preds(model, input_tensor, n_mc=C.N_MC)
-    pred_H = U.predictive_entropy(mc_preds)
-    exp_H  = U.expected_entropy(mc_preds)
+        get_entropy = K.function([input_tensor], [pred_H])
+        get_bald    = K.function([input_tensor], [pred_H - exp_H])
 
-    get_entropy = K.function([input_tensor], [pred_H])
-    get_bald    = K.function([input_tensor], [pred_H - exp_H])
+        return get_entropy, get_bald
 
-    return get_entropy, get_bald
+    epsilons = np.linspace(0,1.5,10)
+    e, b = get_closures()
+    f1 = generate_path_plots(CallableModelWrapper(mc_keras_model, 'probs'),e,b, data, data[5:6], epsilons = epsilons)
 
-epsilons = np.linspace(0,1.5,10)
-e, b = get_closures()
-f1 = generate_path_plots(CallableModelWrapper(mc_keras_model, 'probs'),e,b, data, data[5:6], epsilons = epsilons)
+    hmc_weights = pickle.load(open(os.path.join(LOAD_PATH, 'hmc_ensemble_weights.pickle'), 'rb'))
 
-hmc_weights = pickle.load(open(os.path.join(LOAD_PATH, 'hmc_ensemble_weights.pickle'), 'rb'))
+           
 
-       
-
-hmc_model = HMCKerasModel(hmc_weights)
-wrapper = CallableModelWrapper(hmc_model,'probs')
-e,b = hmc_model.generate_closures()
-f2 = generate_path_plots(wrapper, e,b,data, data[5:6], epsilons=epsilons) 
+    hmc_model = HMCKerasModel(hmc_weights)
+    wrapper = CallableModelWrapper(hmc_model,'probs')
+    e,b = hmc_model.generate_closures()
+    f2 = generate_path_plots(wrapper, e,b,data, data[5:6], epsilons=epsilons) 
 
