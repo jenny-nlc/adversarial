@@ -8,33 +8,35 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.preprocessing import scale
 import src.utilities as U
+import src.plot_utils as pu
 from keras.layers import Dense
 from src.concrete_dropout import ConcreteDropout
 from visualise_adversarial_progress import FastGradientRange
 from matplotlib import pyplot as plt
 from cleverhans.model import CallableModelWrapper
-
+import sklearn
 
 H_ACT = 'elu'  # Might not be optimal, but a standard choice.
 N_HIDDEN_UNITS = 500
-N_DATA = 1000
-LENGTH_SCALE = 5e-1 #setting a low length scale encourages uncertainty to be higher.
+N_DATA = 569
+LENGTH_SCALE = 1 #setting a low length scale encourages uncertainty to be higher.
 MODEL_PRECISION = 1 #classification problem: see Gal's Thesis
 WEIGHT_DECAY = LENGTH_SCALE ** 2 / (2 * N_DATA * MODEL_PRECISION)
 WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
 DROPOUT_REGULARIZER = 1 / (MODEL_PRECISION * N_DATA)
 N_MC = 50
-N_CLASSES = 5
+N_CLASSES = 2
 
-N_FEATURES = 50
+N_FEATURES = 30
 
-ORD = np.inf
+ORD = 2
 TRAIN_SPLIT = 0.8
 N_INFORMATIVE=10
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
 plt.rcParams['pdf.fonttype'] = 42 
 plt.rcParams['ps.fonttype'] = 42 
+
 
 def define_cdropout_model():
     """
@@ -43,7 +45,9 @@ def define_cdropout_model():
     """
     inputs = keras.layers.Input(shape=(N_FEATURES,))
 
-    h1 = Dense(N_HIDDEN_UNITS, activation=H_ACT)(inputs)
+    h1 = ConcreteDropout(Dense(N_HIDDEN_UNITS, activation=H_ACT),
+                         weight_regularizer=WEIGHT_REGULARIZER,
+                         dropout_regularizer=DROPOUT_REGULARIZER)(inputs)
     h2 = ConcreteDropout(Dense(N_HIDDEN_UNITS, activation=H_ACT),
                          weight_regularizer=WEIGHT_REGULARIZER,
                          dropout_regularizer=DROPOUT_REGULARIZER)(h1)
@@ -61,6 +65,7 @@ if __name__ == "__main__":
                               class_sep = 1,
                               flip_y = 0.001)
     
+    x,y = sklearn.datasets.load_breast_cancer(return_X_y=True)
     y = keras.utils.to_categorical(y)
     x = scale(x)
     split = int(TRAIN_SPLIT * N_DATA)
@@ -73,7 +78,7 @@ if __name__ == "__main__":
 
     model.compile(
         optimizer=keras.optimizers.SGD(
-            lr = 0.05,
+            lr = 0.01,
             momentum=0.1,
             decay=0.0001,
             nesterov=True,
@@ -86,7 +91,7 @@ if __name__ == "__main__":
 
     fgr = FastGradientRange(CallableModelWrapper(mc_model,'probs'), sess=K.get_session())
 
-    epsilons = np.linspace(0,1,50)
+    epsilons = np.linspace(0,3,50)
     adv_steps = fgr.generate(input_tensor, epsilons=epsilons, ord=ORD) 
 
     advs = [s.eval(session=K.get_session(), feed_dict={input_tensor: x_test}) for s in adv_steps]
@@ -126,14 +131,14 @@ if __name__ == "__main__":
 
     fig, axes = plt.subplots(3,1)
 
-    axes[0].plot(epsilons,adv_balds.mean(axis=1), c='b', label='Adversarial Direction')
-    axes[0].plot(epsilons,rnd_balds.mean(axis=1), c='r', label='Random Direction')
+    pu.var_fill_plot(axes[0], epsilons,adv_balds, c='b', label='Adversarial Direction')
+    pu.var_fill_plot(axes[0], epsilons,rnd_balds, c='r', label='Random Direction')
     axes[0].set_xlabel('Step size ({} norm)'.format(ORD))
     axes[0].set_ylabel('Average BALD')
     axes[0].legend()
 
-    axes[1].plot(epsilons,adv_entropies.mean(axis=1), c='b', label='Adversarial Direction')
-    axes[1].plot(epsilons,rnd_entropies.mean(axis=1), c='r', label='Random Direction')
+    pu.var_fill_plot(axes[1], epsilons,adv_entropies, c='b', label='Adversarial Direction')
+    pu.var_fill_plot(axes[1], epsilons,rnd_entropies, c='r', label='Random Direction')
     axes[1].set_xlabel('Step size ({} norm)'.format(ORD))
     axes[1].set_ylabel('Average Entropy')
     axes[1].legend()

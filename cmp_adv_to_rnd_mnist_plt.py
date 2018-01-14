@@ -3,6 +3,7 @@ import pickle
 import sys
 import os
 import numpy as np
+import src.plot_utils as pu
 
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
@@ -20,14 +21,14 @@ if __name__ == "__main__":
         x_test, y_test = pickle.load(f)
     fig, axes = plt.subplots(3,1)
 
-    axes[0].plot(epsilons,adv_balds.mean(axis=1), c='b', label='Adversarial Direction')
-    axes[0].plot(epsilons,rnd_balds.mean(axis=1), c='r', label='Random Direction')
+    pu.var_fill_plot(axes[0], epsilons,adv_balds, c='b', label='Adversarial Direction')
+    pu.var_fill_plot(axes[0], epsilons,rnd_balds, c='r', label='Random Direction')
     axes[0].set_xlabel('Step size ({} norm)'.format(ORD))
     axes[0].set_ylabel('Average BALD')
     axes[0].legend()
 
-    axes[1].plot(epsilons,adv_entropies.mean(axis=1), c='b', label='Adversarial Direction')
-    axes[1].plot(epsilons,rnd_entropies.mean(axis=1), c='r', label='Random Direction')
+    pu.var_fill_plot(axes[1], epsilons,adv_entropies, c='b', label='Adversarial Direction')
+    pu.var_fill_plot(axes[1], epsilons,rnd_entropies, c='r', label='Random Direction')
     axes[1].set_xlabel('Step size ({} norm)'.format(ORD))
     axes[1].set_ylabel('Average Entropy')
     axes[1].legend()
