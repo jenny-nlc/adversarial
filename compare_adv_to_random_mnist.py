@@ -235,4 +235,6 @@ if __name__ == '__main__':
                      rnd_balds], f)
     with open(os.path.join(save_path, 'mnist_sample.pickle'), 'wb') as f:
         pickle.dump((x_test, y_test), f)
-        
+
+    with open(os.path.join(save_path, 'perturbations.pickle'), 'wb') as f:
+        pickle.dump((advs, perturbs), f)
