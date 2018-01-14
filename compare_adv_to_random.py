@@ -15,22 +15,21 @@ from matplotlib import pyplot as plt
 from cleverhans.model import CallableModelWrapper
 
 
-H_ACT = 'relu'  # Might not be optimal, but a standard choice.
+H_ACT = 'elu'  # Might not be optimal, but a standard choice.
 N_HIDDEN_UNITS = 500
-N_DATA = 100
-LENGTH_SCALE = 1e-2 #setting a low length scale encourages uncertainty to be higher.
+N_DATA = 1000
+LENGTH_SCALE = 5e-1 #setting a low length scale encourages uncertainty to be higher.
 MODEL_PRECISION = 1 #classification problem: see Gal's Thesis
 WEIGHT_DECAY = LENGTH_SCALE ** 2 / (2 * N_DATA * MODEL_PRECISION)
 WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
 DROPOUT_REGULARIZER = 1 / (MODEL_PRECISION * N_DATA)
 N_MC = 50
-N_CLASSES = 2  # number of classes
+N_CLASSES = 5
 
-N_FEATURES = 100
+N_FEATURES = 50
 
-ORD = 2
-N_SAMPLES = 1500
-TRAIN_SPLIT = 0.9
+ORD = np.inf
+TRAIN_SPLIT = 0.8
 N_INFORMATIVE=10
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
@@ -56,13 +55,15 @@ def define_cdropout_model():
 if __name__ == "__main__":
 
     x,y = make_classification(n_classes = N_CLASSES,
-                              n_samples = N_SAMPLES,
+                              n_samples = N_DATA,
                               n_features=N_FEATURES,
-                              n_informative=N_INFORMATIVE)
+                              n_informative=N_INFORMATIVE,
+                              class_sep = 1,
+                              flip_y = 0.001)
     
     y = keras.utils.to_categorical(y)
     x = scale(x)
-    split = int(TRAIN_SPLIT * N_SAMPLES)
+    split = int(TRAIN_SPLIT * N_DATA)
     x_train = x[:split]
     y_train = y[:split]
     x_test  = x[split:]
@@ -85,7 +86,7 @@ if __name__ == "__main__":
 
     fgr = FastGradientRange(CallableModelWrapper(mc_model,'probs'), sess=K.get_session())
 
-    epsilons = np.linspace(0,2,50)
+    epsilons = np.linspace(0,1,50)
     adv_steps = fgr.generate(input_tensor, epsilons=epsilons, ord=ORD) 
 
     advs = [s.eval(session=K.get_session(), feed_dict={input_tensor: x_test}) for s in adv_steps]
@@ -121,6 +122,7 @@ if __name__ == "__main__":
     rnd_preds = np.array(rnd_preds)
     rnd_entropies = np.array(rnd_entropies)
     rnd_balds = np.array(rnd_balds)
+    print('done')
 
     fig, axes = plt.subplots(3,1)
 
