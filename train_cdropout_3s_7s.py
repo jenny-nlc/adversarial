@@ -1,7 +1,5 @@
 """
-This is a model trained only on the 3 / 7s mnist problem. It includes an artificially low
-dimensional final hidden layer, in order to attempt to visualise what's going on with the
-uncertainty deeper inside the network.
+This is a model trained only on the 3 / 7s mnist problem.
 """
 import keras
 from keras.models import Sequential
@@ -55,7 +53,7 @@ class TrackConcreteDropoutP(keras.callbacks.Callback):
     def on_batch_end(self, batch, logs={}):
         return
 
-def define_cdropout_compressor(N_data=12396)
+def define_cdropout_3s_7s(N_DATA=12396):
     LENGTH_SCALE = 0.25 #setting a low length scale encourages uncertainty to be higher.
     MODEL_PRECISION = 1 #classification problem: see Gal's Thesis
     WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
@@ -63,7 +61,8 @@ def define_cdropout_compressor(N_data=12396)
     N_MC = 50
     N_CLASSES = 2
     input_shape = (28,28,1)
-
+    act_fn = 'elu'    
+    model = Sequential()
     model.add(ConcreteDropout(Conv2D(32, kernel_size=(3,3),
         activation=act_fn),
                               input_shape=input_shape,
@@ -80,27 +79,21 @@ def define_cdropout_compressor(N_data=12396)
                               weight_regularizer=WEIGHT_REGULARIZER,
                               dropout_regularizer=DROPOUT_REGULARIZER,
                               ))
-    #this special layer is only here for visualisation purposes.
-    model.add(ConcreteDropout(Dense(2, activation=act_fn),
+    model.add(ConcreteDropout(Dense(N_CLASSES, activation='softmax'),
                               weight_regularizer=WEIGHT_REGULARIZER,
                               dropout_regularizer=DROPOUT_REGULARIZER,
     ))
-    model.add(ConcreteDropout(Dense(num_classes, activation='softmax'),
-                              weight_regularizer=WEIGHT_REGULARIZER,
-                              dropout_regularizer=DROPOUT_REGULARIZER,
-    ))
+    return model
 
-
-if __name__ == "__main__"
+if __name__ == "__main__":
 
     x_train, y_train, x_test, y_test = mnist_to_3s_and_7s(U.get_mnist())
     # mnist, scaled to the range 0,1.
 
 
-    epochs=20
+    epochs=50
     batch_size = 128
-    num_classes = 10
-
+    model = define_cdropout_3s_7s()
     model.compile(loss=keras.losses.categorical_crossentropy,
             optimizer=keras.optimizers.Adagrad(),
             metrics=['accuracy'])
@@ -111,4 +104,4 @@ if __name__ == "__main__"
             validation_data=(x_test, y_test),
             callbacks= [TrackConcreteDropoutP(model)]) #check the p values of the c d are converging.
 
-    model.save_weights('mnist_cdrop_comp_w.h5')
+    model.save_weights('mnist_cdrop_3s_7s.h5')
