@@ -95,7 +95,7 @@ if __name__ == "__main__":
     batch_size = 128
     model = define_cdropout_3s_7s()
     model.compile(loss=keras.losses.categorical_crossentropy,
-            optimizer=keras.optimizers.Adagrad(),
+            optimizer=keras.optimizers.Adam(),
             metrics=['accuracy'])
 
     model.fit(x_train, y_train,
