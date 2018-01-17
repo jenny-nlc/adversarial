@@ -37,6 +37,8 @@ plt.rcParams['figure.figsize'] = 8, 8
 plt.rcParams['pdf.fonttype'] = 42 
 plt.rcParams['ps.fonttype'] = 42 
 
+def get_nn_dists(X, xs):
+    return np.array([U.calc_nn_dist(X, x) for x in xs])
 
 def define_cdropout_model():
     """
@@ -152,5 +154,13 @@ if __name__ == "__main__":
     axes[2].set_xlabel('Step size ({} norm)'.format(ORD))
     axes[2].legend()
     axes[2].set_ylabel('Average Accuracy')
+
+    f, ax = plt.subplots()
+    
+    advdists = np.array([get_nn_dists(x_train, adv) for adv in advs])
+    rnddists = np.array([get_nn_dists(x_train, rnd) for rnd in perturbs])
+    pu.var_fill_plot(ax, epsilons, advdists, c='b', label='Adversarial Direction')
+    pu.var_fill_plot(ax, epsilons, rnddists, c='r', label='Random Direction')
+    ax.legend()
 
     plt.show()
