@@ -11,5 +11,3 @@ def var_fill_plot(ax, x, ys, label="", c='blue', alpha =0.4):
     std = ys.std(axis=1)
     ax.fill_between(x, mean - std, mean + std, color = c, alpha = alpha)
     return ax
-
-    
