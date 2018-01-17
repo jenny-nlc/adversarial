@@ -8,6 +8,21 @@ import itertools as itr
 from functools import reduce
 import operator
 
+
+
+def calc_nn_dist(X, y, ord=2):
+    """
+    Calculate the distance between y and it's nearest neighbour in x
+    X is N x d, y is d.
+    """
+
+    #if the inputs are not 2d, flatten the remaining directions
+    
+    X = X.reshape(X.shape[0], -1)
+    y = y.flatten()
+    return np.linalg.norm(X - y, axis=1, ord=ord).min()
+
+
 class MCModel:
     def __init__(self,model, input_tensor, n_mc):
         self.model = model
