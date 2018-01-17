@@ -58,7 +58,6 @@ def define_cdropout_3s_7s(N_DATA=12396):
     MODEL_PRECISION = 1 #classification problem: see Gal's Thesis
     WEIGHT_REGULARIZER =  LENGTH_SCALE ** 2 / (N_DATA * MODEL_PRECISION)
     DROPOUT_REGULARIZER = 1 / (MODEL_PRECISION * N_DATA)
-    N_MC = 50
     N_CLASSES = 2
     input_shape = (28,28,1)
     act_fn = 'elu'    
