@@ -10,18 +10,18 @@ from keras import backend as K
 import src.utilities as U
 from src.concrete_dropout import ConcreteDropout
 
-x_train, y_train, x_test, y_test = U.get_mnist()
 # mnist, scaled to the range 0,1.
-
-model = Sequential()
-
-act_fn = 'relu'
-input_shape = (28,28,1)
-epochs=12
-batch_size = 128
-num_classes = 10
-
 def load_drop_model(weights_file):
+    
+    model = Sequential()
+
+    act_fn = 'relu'
+    input_shape = (28,28,1)
+    epochs=12
+    batch_size = 128
+    num_classes = 10
+
+
     model.add(ConcreteDropout(Conv2D(32, kernel_size=(3,3),
         activation=act_fn),
         input_shape=input_shape))
@@ -35,7 +35,8 @@ def load_drop_model(weights_file):
     return model
 
 if __name__ == '__main__':
-    model = load_drop_model
+    x_train, y_train, x_test, y_test = U.get_mnist()
+    model = load_drop_model()
     x = K.placeholder(shape=[None] + list(x_test.shape[1:]))
     preds_tensor = U.mc_dropout_preds(model, x, 50)
 
