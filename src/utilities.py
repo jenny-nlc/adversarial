@@ -38,6 +38,10 @@ class MCModel:
                        [K.mean(self.mc_preds_t, axis=0),
                         self.predictive_entropy_t, self.bald_t])
         return f([x])
+    def get_mc_preds(self, x):
+        f = K.function([self.input], [self.mc_preds_t])
+        return f([x])[0]
+
     def predict(self, x):
         return self.get_results(x)[0]
     def __call__(self, x):
