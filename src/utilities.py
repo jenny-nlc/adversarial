@@ -7,8 +7,48 @@ from keras.datasets import mnist
 import itertools as itr
 from functools import reduce
 import operator
+import re
+from PIL import Image
 
+def crop_center_or_reshape(im, size):
+     
+    tw, th = size
 
+    im.thumbnail((int(tw * 1.5), int(th + 1.5)) )#heuristic 
+    iw,ih = im.size
+
+    left = np.ceil((iw - tw) / 2)
+    right = iw - np.floor((iw - tw) / 2)
+    top = np.ceil((ih - th) / 2)
+    bottom = ih - np.floor((ih - th) / 2)
+    im = im.crop((left, top, right, bottom))
+    if im.size != size:
+        raise RuntimeError
+    return im
+    
+def load_jpgs(path, size=(224,224)):
+    """
+    Load all jpgs on a path into a numpy array, resizing to a given image size
+    """
+    fnames = os.listdir(path)
+    imgs = []
+    i = 0
+    for f in fnames:
+        if not re.match('.*\.(jpg|jpeg|JPEG|JPG)', f):
+            continue
+        try:
+            im = Image.open(os.path.join(path,f))
+        except OSError as e:
+            continue #ignore corrupt files
+        if im.mode != 'RGB':
+            im = im.convert('RGB')
+        im = crop_center_or_reshape(im, size)
+        img = np.asarray(im)
+        #img = tf.image.resize_image_with_crop_or_pad(x, size[0], size[1]).eval(session=K.get_session())
+            
+        imgs.append(img)
+        
+    return np.array(imgs)
 
 def calc_nn_dist(X, y, ord=2):
     """
