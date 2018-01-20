@@ -129,7 +129,7 @@ def load_model():
     model.add(ConcreteDropout(Dense(128, activation=act_fn)))
     model.add(ConcreteDropout(Dense(num_classes, activation='softmax')))
 
-    model.load_weights('mnist_cdrop_cnn.h5')
+    model.load_weights('save/mnist_cdrop_cnn.h5')
     return model
 def H(p):
     return - np.sum( p * np.log(p + 1e-10), axis=-1)
@@ -145,15 +145,15 @@ def eval_perturbations(perturbations, mc_model, batch_size=256):
     N = len(perturbations)
     for i,a in enumerate(perturbations):
         print('Eps {} of {}'.format(i,N))
-        mc_preds = np.concatenate([mc_model.get_mc_preds(x) for x in batch_gen(a, batch_size=batch_size)] , axis=2)
+        mc_preds = np.concatenate([mc_model.get_mc_preds(x) for x in batch_gen(a, batch_size=batch_size)] , axis=1)
         bpred = mc_preds.mean(axis=0)
         bentropy = H(bpred) 
         bbald = bentropy - H(mc_preds).mean(axis=0)
         bvars = variance_score(mc_preds)
         preds.append(bpred)
-        entropies.append(bentropy)
-        balds.append(bbald)
-        var_s.append(bvars)
+        entropies.append(bentropy.mean())
+        balds.append(bbald.mean())
+        var_s.append(bvars.mean())
 
     preds = np.array(preds)
     entropies = np.array(entropies)
