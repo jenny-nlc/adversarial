@@ -151,9 +151,9 @@ def eval_perturbations(perturbations, mc_model, batch_size=256):
         bbald = bentropy - H(mc_preds).mean(axis=0)
         bvars = variance_score(mc_preds)
         preds.append(bpred)
-        entropies.append(bentropy.mean())
-        balds.append(bbald.mean())
-        var_s.append(bvars.mean())
+        entropies.append(bentropy)
+        balds.append(bbald)
+        var_s.append(bvars)
 
     preds = np.array(preds)
     entropies = np.array(entropies)
