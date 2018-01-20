@@ -131,25 +131,35 @@ def load_model():
 
     model.load_weights('mnist_cdrop_cnn.h5')
     return model
+def H(p):
+    return - np.sum( p * np.log(p + 1e-10), axis=-1)
+
+def variance_score(mc_p):
+    return np.mean(mc_p.var(axis=0), axis=-1) 
 
 def eval_perturbations(perturbations, mc_model, batch_size=256): 
     preds = []
     entropies = []
     balds = []
+    var_s = []
     N = len(perturbations)
     for i,a in enumerate(perturbations):
         print('Eps {} of {}'.format(i,N))
-        zipres = [mc_model.get_results(x) for x in batch_gen(a, batch_size=batch_size)] 
-        bpred = np.concatenate([x[0] for x in zipres]) 
-        bentropy = np.concatenate([x[1] for x in zipres])
-        bbald = np.concatenate([x[2] for x in zipres])
+        mc_preds = np.concatenate([mc_model.get_mc_preds(x) for x in batch_gen(a, batch_size=batch_size)] , axis=2)
+        bpred = mc_preds.mean(axis=0)
+        bentropy = H(bpred) 
+        bbald = bentropy - H(mc_preds).mean(axis=0)
+        bvars = variance_score(mc_preds)
         preds.append(bpred)
         entropies.append(bentropy)
         balds.append(bbald)
+        var_s.append(bvars)
+
     preds = np.array(preds)
     entropies = np.array(entropies)
     balds = np.array(balds)
-    return preds, entropies, balds
+    var_s = np.array(var_s)
+    return preds, entropies, balds, var_s
 
 def batch_gen(array, batch_size=256):
     N = array.shape[0]
@@ -205,7 +215,7 @@ if __name__ == '__main__':
     advs = [x_test + ep * adv_etas for ep in epsilons]
     advs = np.clip(advs, 0,1)
     print('Calculating adversarial pertubations...')
-    adv_preds, adv_entropies, adv_balds = eval_perturbations(advs, mc_model, batch_size=batch_size) 
+    adv_preds, adv_entropies, adv_balds, adv_vars = eval_perturbations(advs, mc_model, batch_size=batch_size) 
      
     
 
@@ -221,7 +231,7 @@ if __name__ == '__main__':
     perturbs = np.clip(perturbs, 0, 1)
 
     print('Calculating random pertubations...')
-    rnd_preds, rnd_entropies, rnd_balds = eval_perturbations(perturbs, mc_model, batch_size=batch_size)
+    rnd_preds, rnd_entropies, rnd_balds, rnd_vars = eval_perturbations(perturbs, mc_model, batch_size=batch_size)
 
     save_path = U.create_unique_folder(os.path.join('save', 'mnist_pertubations_{}_norm_run_'.format(ORD)))
 
@@ -230,9 +240,11 @@ if __name__ == '__main__':
                      adv_preds,
                      adv_entropies,
                      adv_balds,
+                     adv_vars,
                      rnd_preds,
                      rnd_entropies,
-                     rnd_balds], f)
+                     rnd_balds,
+                     rnd_vars], f)
     with open(os.path.join(save_path, 'mnist_sample.pickle'), 'wb') as f:
         pickle.dump((x_test, y_test), f)
 
