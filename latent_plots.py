@@ -1,6 +1,7 @@
+import os
+
 import keras
 import numpy as np
-import seaborn as sns
 from keras import backend as K
 from matplotlib import pyplot as plt
 from scipy.stats import norm
@@ -11,13 +12,10 @@ from cleverhans.model import CallableModelWrapper
 from load_dropout_model import load_drop_model
 from train_cdropout_3s_7s import define_cdropout_3s_7s, mnist_to_3s_and_7s
 from train_mnist_vae import define_VAE
-
-
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
 plt.rcParams['pdf.fonttype'] = 42 
 plt.rcParams['ps.fonttype'] = 42 
-
 
 def visualise_latent_space(decoder, n_grid=10):
     grid = norm.ppf(np.linspace(0.01,0.99, n_grid))
@@ -63,10 +61,24 @@ def get_models():
     encoder.load_weights('save/enc_weights.h5')
     decoder.load_weights('save/dec_weights.h5')
 
-    model = load_drop_model('save/mnist_cdrop_cnn_run_2.h5')
+    model = load_drop_model('save/mnist_cdrop_cnn_run.h5')
     mc_model = U.MCModel(model, model.input, n_mc=50)
     #we have been using more mc samples elsewhere, but save time for now
     return mc_model, encoder, decoder
+
+def get_model_ensemble(n_mc=10):
+    _, encoder, decoder = define_VAE()
+    encoder.load_weights('save/enc_weights.h5')
+    decoder.load_weights('save/dec_weights.h5')
+
+    models = []
+    for name in filter(lambda x: 'mnist_cdrop_cnn' in x, os.listdir('save')):
+        print('loading model {}'.format(name))
+        model = load_drop_model('save/' + name)
+        models.append(model)
+    mc_model = U.MCEnsembleWrapper(models, n_mc=10)
+    return mc_model, encoder, decoder
+
 
 def get_ML_models():
     _, encoder, decoder = define_VAE()
@@ -104,12 +116,12 @@ def make_interactive_plot(proj_x,
                 cmap=sccmap
     )
 
-    im = ax[0].imshow(plot_ent,
-                      cmap=bgcmap,
-                      origin='lower',
-                      alpha=bgalpha,
-                      extent=extent,
-                     )
+    ax[0].imshow(plot_bg,
+                 cmap=bgcmap,
+                 origin='lower',
+                 alpha=bgalpha,
+                 extent=extent,
+    )
     ax[0].set_xlabel('First Latent Dimension')
     ax[0].set_ylabel('Second Latent Dimension')
     ax[0].set_title(title)
@@ -134,23 +146,13 @@ def make_interactive_plot(proj_x,
             last_sample = dream
     f.canvas.mpl_connect('button_press_event', on_click)
 
-
-class EnsembleWrapper:
-    def __init__(self, modellist):
-        self.ms = modellist
-    def get_results(self, X):
-        mc_preds = np.array([model1.predict(X) for _ in range(25)] + [model2.predict(X) for _ in range(25)])
-        preds = mc_preds.mean(axis=0)
-        ent = -np.sum(preds * np.log(preds + 1e-10), axis=-1)
-        bald = ent - np.mean( - np.sum(mc_preds * np.log(mc_preds + 1e-10), axis=-1), axis=0)
-        return preds, ent, bald
-
 if __name__ == '__main__':
 
     #model, encoder, decoder = get_models_3s_7s()
     
     #x_train, y_train, x_test, y_test = mnist_to_3s_and_7s(U.get_mnist())
-    model, encoder, decoder = get_models()
+    # model, encoder, decoder = get_models()
+    model, encoder, decoder = get_model_ensemble(n_mc=20)
     
     x_train, y_train, x_test, y_test = U.get_mnist()
 
