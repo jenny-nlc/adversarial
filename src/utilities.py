@@ -10,6 +10,25 @@ import operator
 import re
 from PIL import Image
 
+class MCEnsembleWrapper:
+    """
+    This class wraps a list of models all of which are mc models
+    """
+    def __init__(self, modellist, n_mc):
+        self.ms = modellist
+        self.n_mc = n_mc
+    def predict(self, X):
+        mc_preds = np.concatenate( [np.stack([m.predict(X) for _ in range(self.n_mc)])
+                                    for m in self.ms], axis=0)
+        return mc_preds.mean(axis=0)
+    def get_results(self, X):
+        mc_preds = np.concatenate( [np.stack([m.predict(X) for _ in range(self.n_mc)])
+                                    for m in self.ms], axis=0)
+        preds = mc_preds.mean(axis=0)
+        ent = -np.sum(preds * np.log(preds + 1e-10), axis=-1)
+        bald = ent - np.mean( - np.sum(mc_preds * np.log(mc_preds + 1e-10), axis=-1), axis=0)
+        return preds, ent, bald
+
 def crop_center_or_reshape(im, size):
      
     tw, th = size
