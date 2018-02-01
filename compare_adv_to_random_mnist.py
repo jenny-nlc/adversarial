@@ -111,26 +111,6 @@ class FastGrad(FastGradientMethod):
 
         return True
 
-
-def load_model():
-    model = Sequential()
-
-    act_fn = 'relu'
-    input_shape = (28,28,1)
-    num_classes = 10
-
-
-    model.add(ConcreteDropout(Conv2D(32, kernel_size=(3,3),
-        activation=act_fn),
-        input_shape=input_shape))
-    model.add(ConcreteDropout(Conv2D(64, (3,3), activation=act_fn)))
-    model.add(MaxPooling2D(pool_size=(2,2)))
-    model.add(Flatten())
-    model.add(ConcreteDropout(Dense(128, activation=act_fn)))
-    model.add(ConcreteDropout(Dense(num_classes, activation='softmax')))
-
-    model.load_weights('save/mnist_cdrop_cnn.h5')
-    return model
 def H(p):
     return - np.sum( p * np.log(p + 1e-10), axis=-1)
 
@@ -200,7 +180,7 @@ if __name__ == '__main__':
     x_train, y_train, x_test, y_test = U.get_mnist()
     x_test = x_test[:args.N_data]
     y_test = y_test[:args.N_data]
-    model = load_model()
+    model = U.load_cdropout_model()
     input_tensor = model.input
     mc_model = U.MCModel(model, input_tensor, n_mc = args.N_mc )
 
