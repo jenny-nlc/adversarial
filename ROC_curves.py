@@ -28,7 +28,7 @@ def make_random_targets(y, n_classes=10):
     """
     labels = y.argmax(axis=1)
     new = (labels + np.random.randint(1, n_classes - 1) ) % n_classes
-    return to_categorical(new, n_classes=n_classes)
+    return to_categorical(new, num_classes=n_classes)
 def get_models():
 
     models = []
