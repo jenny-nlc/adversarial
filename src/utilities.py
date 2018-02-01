@@ -9,6 +9,29 @@ from functools import reduce
 import operator
 import re
 from PIL import Image
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.models import Sequential
+from .concrete_dropout import ConcreteDropout
+
+def load_cdropout_model():
+    model = Sequential()
+
+    act_fn = 'relu'
+    input_shape = (28,28,1)
+    num_classes = 10
+
+
+    model.add(ConcreteDropout(Conv2D(32, kernel_size=(3,3),
+        activation=act_fn),
+        input_shape=input_shape))
+    model.add(ConcreteDropout(Conv2D(64, (3,3), activation=act_fn)))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Flatten())
+    model.add(ConcreteDropout(Dense(128, activation=act_fn)))
+    model.add(ConcreteDropout(Dense(num_classes, activation='softmax')))
+
+    model.load_weights('save/mnist_cdrop_cnn.h5')
+    return model
 
 class MCEnsembleWrapper:
     """
@@ -28,7 +51,16 @@ class MCEnsembleWrapper:
         ent = -np.sum(preds * np.log(preds + 1e-10), axis=-1)
         bald = ent - np.mean( - np.sum(mc_preds * np.log(mc_preds + 1e-10), axis=-1), axis=0)
         return preds, ent, bald
-
+    def __call__(self, X):
+        """
+        Returns the mean prediction of the entire ensemble as a keras tensor to allow differentiation
+        """
+        return K.mean(
+            K.stack(
+                [K.mean(mc_dropout_preds(m, X, n_mc=self.n_mc), axis=0)
+                     for m in self.ms]
+            ),
+            axis=0)
 def crop_center_or_reshape(im, size):
      
     tw, th = size
@@ -51,7 +83,6 @@ def load_jpgs(path, size=(224,224)):
     """
     fnames = os.listdir(path)
     imgs = []
-    i = 0
     for f in fnames:
         if not re.match('.*\.(jpg|jpeg|JPEG|JPG)', f):
             continue

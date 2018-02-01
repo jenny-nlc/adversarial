@@ -1,157 +1,214 @@
-from cleverhans.attacks_tf import fgm
+import argparse
 import os
 import sys
+
 import numpy as np
-from keras.models import load_model
 from keras import backend as K
-from sklearn.metrics import roc_curve, roc_auc_score
-import src.utilities as U
-import argparse
-import matplotlib as mpl
-mpl.use('Agg')
+from keras.models import load_model
+from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, average_precision_score
 from matplotlib import pyplot as plt
-
+from keras.utils import to_categorical
+import src.utilities as U
+from load_dropout_model import load_drop_model
+from cleverhans import attacks
+from cleverhans.model import CallableModelWrapper
 
 """
-This script compares the ROC for entropy and BALD for fgm with a given norm at
-various stepsizes epsilon. It plots and saves these curves, and also plots a
-sample of the adverserial examples generated for visualisation.
+This script calculates the ROC for various models for the basic iterative method.
+TODO: use CW attack? but this has a non-straightforward generalisation...
 """
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--eps_min', type=float, default=0.1, help="Minimum value \
-    of epsilon to generate adverserial examples with FGM")
-parser.add_argument('--eps_max', type=float, default=1, help="Max value of \
-    epsilon to generate adverserial examples with")
-parser.add_argument('--N_eps', type=float, default=10, help="Number of values \
-    of epsilon to use (linspace eps_min eps_max)")
-parser.add_argument('--N_data', type=int, default=100, help="Number of examples \
-    of adverserial and non-adverserial examples to use. If 0 will use the \
-    entire dataset")
-parser.add_argument('--norm', default='inf', help="which norm to use: \
-    currently <- {1,2,inf}")
-parser.add_argument('--N_mc', default=50, type=int, help="Number of MC forward \
-    passes to use.")
+def shuffle_dataset(x, y):
+    inds = np.random.permutation(x.shape[0])
+    return x[inds], y[inds]
 
-args = parser.parse_args()
+def make_random_targets(y, n_classes=10):
+    """
+    Return one hot vectors that differ from the labels in y
+    """
+    labels = y.argmax(axis=1)
+    new = (labels + np.random.randint(1, n_classes - 1) ) % n_classes
+    return to_categorical(new, num_classes=n_classes)
+def get_models():
 
-if args.norm == 'inf':
-    norm = np.inf
-elif args.norm == '1':
-    norm = 1
-elif args.norm == '2':
-    norm = 2
-else:
-    raise NotImplementedError("Norms other than 1,2, inf not implemented")
+    models = []
+    K.set_learning_phase(True)
+    model = load_model('save/mnist_cnn_run_3.h5')
+    models.append(('MC Dropout cnn',U.MCModel(model, model.input, n_mc=30)))
 
+    K.set_learning_phase(False)
+    model = load_model('save/mnist_cnn_run_3.h5') 
+    models.append(('Deterministic CNN (dropout)',model))
 
-eps = np.linspace(args.eps_min, args.eps_max, args.N_eps)
-SYNTH_DATA_SIZE = args.N_data
+    model = load_model('save/mnist_cnn_no_drop_run.h5')
+    models.append(('Deterministic CNN (no dropout)', model))
+    # model = load_drop_model('save/mnist_cdrop_cnn_run.h5')
+    # model = U.MCModel(model, model.input,n_mc=30)
+    # models.append(('Concrete Dropout CNN', model))
 
-x_test, y_test, x_train, y_train = U.get_mnist()
+    # ms = []
+    # for name in filter(lambda x: 'mnist_cdrop_cnn_run' in x, os.listdir('save')):
+    #     print('loading model {}'.format(name))
+    #     model = load_drop_model('save/' + name)
+    #     ms.append(model)
+    # model = U.MCEnsembleWrapper(ms, n_mc=20)
+    # models.append(('Ensemble CNN (cdropout)', model))
+ 
+    ms = []
+    for name in filter(lambda x: 'mnist_cnn' in x, os.listdir('save')):
+        print('loading model {}'.format(name))
+        model = load_model('save/' + name)
+        ms.append(model)
+    model = U.MCEnsembleWrapper(ms, n_mc=20)
+    models.append(('Ensemble CNN', model))
 
+    return models
 
-K.set_learning_phase(True)
-# load the pre-trained model (trained by another file)
-model = load_model('mnist_cnn.h5')
+def plot(models, fpr_entropies, tpr_entropies, fpr_balds, tpr_balds, prec_entropies, rec_entropies, prec_balds, rec_balds):
+    plt.figure(1)
+    plt.figure(2)
 
-n_mc = args.N_mc
+    for i, (name,_) in enumerate(models):
+      plt.figure(1)
+      plt.plot(fpr_entropies[i], tpr_entropies[i], label="{} entropy".format(name))
+      plt.plot(fpr_balds[i], tpr_balds[i], label="{} bald".format(name))
 
-x = K.placeholder(shape=[None] + list(x_test.shape[1:]))
-mc_preds_tensor = U.mc_dropout_preds(model, x, n_mc)
-entropy_mean_tensor = U.predictive_entropy(mc_preds_tensor)
-bald_tensor = U.BALD(mc_preds_tensor)
-get_output = K.function([x], [mc_preds_tensor,
-                              entropy_mean_tensor,
-                              bald_tensor])
-
-
-preds_tensor = K.mean(mc_preds_tensor, axis=0)
-
-# create a synthetic training set at various epsilons, 
-# and evaluate the ROC curves on it
-
-x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
-x_to_adv = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
-
-x_advs_plot = [U.tile_images([x_to_adv[i] for i in range(10)], horizontal=False)]
-
-# label zero for non adverserial input
-x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)]
-x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
-
-
-adv_distances = []
-bald_aucs = []
-H_aucs = []
-
-plt.figure()
-for i, ep in enumerate(eps):
-
-    # log progress
-    print("iteration {} of {}, ep = {}".format(i, len(eps), ep))
-    sys.stdout.flush()  # force a write if we have redirected stdout
-
-    adv_tensor = fgm(x, preds_tensor, eps=ep, ord=norm, clip_min=0, clip_max=1)
-
-    x_adv = adv_tensor.eval(session=K.get_session(),
-                            feed_dict={x: x_to_adv})
-
-    # calculate the L-norm distances between the adv examples and the originals
-    dists = U.batch_L_norm_distances(x_to_adv, x_adv, ord=norm)
-    adv_distances.append(dists.mean())
-
-    x_synth = np.concatenate([x_real, x_adv])
-    y_synth = np.array(x_real_label + x_adv_label)
-
-    # save the adverserial examples to plot
-    x_advs_plot.append(U.tile_images([x_adv[i] for i in range(10)],
-                                   horizontal=False))
-
-    # get the entropy and bald on this task
-
-    _, entropy, bald = get_output([x_synth])
-
-    fpr_entropy, tpr_entropy, _ = roc_curve(y_synth, entropy, pos_label=1)
-    fpr_bald, tpr_bald, _ = roc_curve(y_synth, bald,    pos_label=1)
-
-    AUC_entropy = roc_auc_score(y_synth, entropy)
-    AUC_bald = roc_auc_score(y_synth, bald)
-
-    H_aucs.append(AUC_entropy)
-    bald_aucs.append(AUC_bald)
-
-    plt.clf()  # avoid making too many figures by resuing the same one
-    plt.plot(
-        fpr_entropy,
-        tpr_entropy,
-        label="Entropy, AUC: {}".format(AUC_entropy))
-    plt.plot(
-        fpr_bald,
-        tpr_bald,
-        label="BALD, AUC: {}".format(AUC_bald))
-    plt.xlabel('FPR')
-    plt.ylabel('TPR')
+      plt.figure(2)
+      plt.plot(rec_entropies[i],prec_entropies[i], label="{} entropy".format(name))
+      plt.plot(rec_balds[i],prec_balds[i], label="{} bald".format(name))
+      
     plt.legend()
-    plt.savefig(os.path.join("output", "ROC_eps_{}.png".format(ep)))
+    plt.show()
 
-# plot the adverserial images
-plt.figure()
-tile = U.tile_images(x_advs_plot, horizontal=True)
-plt.imshow(tile, cmap='gray_r')
-plt.savefig(os.path.join(
-    "output", "adv_images_ep_{}_to_{}.png".format(eps.min(), eps.max())))
+   
+if __name__ == '__main__':
 
-plt.figure()
-plt.plot(eps, adv_distances)
-plt.xlabel("FGSM Epsilon")
-plt.ylabel("Average L{} distance of advererial images".format(norm))
-plt.savefig(os.path.join("output", "{}_norm_eps_vs_avg_dist.png".format(norm)))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--N_data', type=int, default=100, help="Number of examples \
+        of adverserial and non-adverserial examples to use. If 0 will use the \
+        entire dataset")
 
-plt.figure()
-plt.plot(eps, H_aucs, label="Entropy")
-plt.plot(eps, bald_aucs, label="BALD")
-plt.xlabel('FGM Epsilon')
-plt.ylabel('AUC')
-plt.legend()
-plt.savefig(os.path.join("output", "{}_norm_eps_vs_auc.png".format(norm)))
+    args = parser.parse_args()
+
+    SYNTH_DATA_SIZE = args.N_data
+
+    x_test, y_test, x_train, y_train = U.get_mnist()
+
+
+    # load the pre-trained models 
+    models_to_eval = get_models() 
+
+    # create a synthetic training set at various epsilons, 
+    # and evaluate the ROC curves on it. Combine adversarial and random pertubations
+
+    x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+    to_adv_inds = np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)
+    x_to_adv = x_test[to_adv_inds]
+    x_to_adv_labs = y_test[to_adv_inds]
+    x_plus_noise = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+
+    x_advs_plot = [U.tile_images([x_to_adv[i] for i in range(15)], horizontal=False)]
+
+    # label zero for non adverserial input
+    x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)]
+    x_plus_noise_label = [0 for _ in range(SYNTH_DATA_SIZE)]
+    x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
+
+    fpr_entropies = []
+    tpr_entropies = []
+
+    fpr_balds = []
+    tpr_balds = []
+
+    prec_entropies = []
+    rec_entropies = []
+
+    prec_balds = []
+    rec_balds = []
+
+    AUC_entropies = []
+    AUC_balds = []
+
+    AP_entropies = []
+    AP_balds = []
+
+
+    for i, (name, m) in enumerate(models_to_eval):
+
+        input_t = K.placeholder(shape=(None, 28, 28, 1))
+
+        wrap = CallableModelWrapper(m, 'probs')
+
+        attack = attacks.BasicIterativeMethod(wrap, sess=K.get_session(), back='tf')
+
+        adv_tensor = attack.generate(input_t,
+                                     eps=50,
+                                     nb_iter=10, 
+                                     eps_iter=5,
+                                  ord=1,
+                                  clip_min=0,
+                                  clip_max=1,
+                                  y_targets = make_random_targets(x_to_adv_labs) 
+        )
+        x_adv = adv_tensor.eval(session=K.get_session(),
+                                feed_dict={input_t: x_to_adv})
+        #check the examples are really adversarial
+        preds = m.predict(x_adv).argmax(axis=1)
+        print("Accuracy on adv examples:", np.mean(np.equal(preds, x_to_adv_labs.argmax(axis=1))))
+
+        # calculate the L-norm distances between the adv examples and the originals
+        dists = U.batch_L_norm_distances(x_to_adv, x_adv, ord=2)
+        noise = np.random.random(size=x_plus_noise.shape)
+        noise /= (dists * np.linalg.norm(noise.reshape(x_plus_noise.shape[0], -1), axis=1))[:, None, None, None]
+        x_plus_noise += noise
+        x_plus_noise = np.clip(x_plus_noise, 0, 1)
+        x_synth = np.concatenate([x_real, x_adv, x_plus_noise])
+        y_synth = np.array(x_real_label + x_adv_label + x_plus_noise_label)
+        #x_synth, y_synth = shuffle_dataset(x_synth, y_synth) no points
+
+        # save the adverserial examples to plot
+        x_advs_plot.append(U.tile_images([x_adv[i] for i in range(15)],
+                                    horizontal=False))
+
+        # get the entropy and bald on this task
+        if hasattr(m, 'get_results'): 
+            _, entropy, bald = m.get_results(x_synth)
+        else:
+            res = m.predict(x_synth)
+            entropy = np.sum( - res * np.log(res + 1e-6), axis=1)
+            bald = np.zeros(entropy.shape) # undefined
+
+        fpr_entropy, tpr_entropy, _ = roc_curve(y_synth, entropy, pos_label=1)
+        fpr_bald, tpr_bald, _ = roc_curve(y_synth, bald,    pos_label=1)
+
+        prec_entr, rec_entr, _ = precision_recall_curve(y_synth, entropy, pos_label=1)
+        prec_bald, rec_bald , _ = precision_recall_curve(y_synth, bald, pos_label=1)
+
+        AUC_entropy = roc_auc_score(y_synth, entropy)
+        AUC_bald = roc_auc_score(y_synth, bald)
+
+        AP_entropy = average_precision_score(y_synth, entropy)
+        AP_bald = average_precision_score(y_synth, bald)
+
+        fpr_entropies.append(fpr_entropy)
+        tpr_entropies.append(tpr_entropy)
+
+        prec_entropies.append(prec_entr) 
+        rec_entropies.append(rec_entr)
+
+        prec_balds.append(prec_bald) 
+        rec_balds.append(rec_bald)
+
+        fpr_balds.append(fpr_bald)
+        tpr_balds.append(tpr_bald)
+
+        AUC_entropies.append(AUC_entropy)
+        AUC_balds.append(AUC_bald)
+
+        AP_entropies.append(AP_entropy)
+        AP_balds.append(AP_bald)
+
+
+
+
+        
