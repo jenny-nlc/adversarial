@@ -13,7 +13,7 @@ from train_cdropout_3s_7s import define_cdropout_3s_7s, mnist_to_3s_and_7s
 from train_mnist_vae import define_VAE
 from scipy import optimize
 
-plt.rcParams['figure.figsize'] = 8, 8
+plt.rcParams['figure.figsize'] = 3, 3
 #use true type fonts only
 plt.rcParams['pdf.fonttype'] = 42 
 plt.rcParams['ps.fonttype'] = 42 
@@ -49,7 +49,7 @@ def get_models():
     encoder.load_weights('save/enc_weights.h5')
     decoder.load_weights('save/dec_weights.h5')
 
-    model = load_drop_model('save/mnist_cdrop_cnn_run_2.h5')
+    model = keras.models.load_model('save/mnist_cnn_run_3.h5')
     mc_model = U.MCModel(model, model.input, n_mc=50)
     #we have been using more mc samples elsewhere, but save time for now
     return mc_model, encoder, decoder
@@ -72,8 +72,8 @@ class LatentSpaceAttack:
                  decoder,
                  latent_dim=2,
                  percentile = 0.01,
-                 r_latent_min = norm.ppf(0.999), #smallest distance from the origin to search
-                 r_latent_max = 20, #arbitrary max distance
+                 r_latent_min = norm.ppf(0.9999), #smallest distance from the origin to search
+                 r_latent_max = 15, #arbitrary max distance
                  batch_size = 500):
         self.model = model
         self.latent_dim = latent_dim
@@ -88,31 +88,32 @@ class LatentSpaceAttack:
         batch_size = self.batch_size if batch_size is None else batch_size 
 
         examples = []
+
+        # choose random directions over the unit sphere by normalising
+            # gaussian random vars
+        rand_dirs = np.random.randn(batch_size * n_examples, self.latent_dim)
+        rand_dirs /= np.linalg.norm(rand_dirs, axis=1, ord=2)[:, None]
+
+        #choose random magnitudes in the interval [min, max)
+        mags = (self.r_latent_max - self.r_latent_min) * np.random.random(size=batch_size * n_examples) + self.r_latent_min
+
+        latent_samples = mags[:, None] * rand_dirs
+        #evaluate the samples
+        preds = model.predict(decoder.predict(latent_samples))
+
+        #choose the example with the most confident prediction for any class 
+
+        best_pred = preds.max(axis=1)
+        examples = []
         for i in range(n_examples):
-        
-            # choose random directions over the unit sphere by normalising
-                # gaussian random vars
-            rand_dirs = np.random.randn(batch_size, self.latent_dim)
-            rand_dirs /= np.linalg.norm(rand_dirs, axis=1, ord=2)[:, None]
+            best = latent_samples[best_pred.argmax()]
+            best_pred = best_pred[ ((latent_samples - best) ** 2).sum(axis=1) > 3]  
+            latent_samples = latent_samples[ ((latent_samples - best) ** 2).sum(axis=1) > 3]  
+            print(latent_samples.shape)
+            examples.append(best)
 
-            #choose random magnitudes in the interval [min, max)
-            mags = (self.r_latent_max - self.r_latent_min) * np.random.random(size=batch_size) + self.r_latent_min
+        return decoder.predict(np.stack(examples)) 
 
-            latent_samples = mags[:, None] * rand_dirs
-
-            #evaluate the samples
-            preds = model.predict(decoder.predict(latent_samples))
-
-            #choose the example with the most confident prediction for any class 
-
-            best_pred = preds.max(axis=1)
-            most_confident = best_pred.argmax()
-
-            examples.append(
-                decoder.predict(latent_samples[most_confident][None, :])
-            )
-
-        return np.concatenate(examples, axis=0)
     def generate_diff_evolution(self, n_examples, batch_size = None):
 
         def objective(z):
@@ -132,6 +133,10 @@ if __name__ == '__main__':
     model, encoder, decoder = get_models()
     
     x_train, y_train, x_test, y_test = U.get_mnist()
+ 
+    x_train, y_train, x_test, y_test = U.get_mnist()
 
-    lsa = LatentSpaceAttack(model, decoder, batch_size = 200)
-    im = lsa.generate_random()
+    lsa = LatentSpaceAttack(model, decoder, batch_size = 50)
+    ims = lsa.generate_random(n_examples=1)
+    plt.imshow(np.concatenate([x for x in ims], axis=1).squeeze(), cmap='gray_r')
+
