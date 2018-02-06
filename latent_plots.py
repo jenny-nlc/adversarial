@@ -12,6 +12,8 @@ from cleverhans.model import CallableModelWrapper
 from load_dropout_model import load_drop_model
 from train_cdropout_3s_7s import define_cdropout_3s_7s, mnist_to_3s_and_7s
 from train_mnist_vae import define_VAE
+from keras.models import load_model
+
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
 plt.rcParams['pdf.fonttype'] = 42 
@@ -215,13 +217,13 @@ if __name__ == '__main__':
     #model, encoder, decoder = get_models_3s_7s()
     
     #x_train, y_train, x_test, y_test = mnist_to_3s_and_7s(U.get_mnist())
-    model, encoder, decoder = get_models()
-    #model, encoder, decoder = get_model_ensemble(n_mc=20)
+#    model, encoder, decoder = get_models()
+    model, encoder, decoder = get_model_ensemble(n_mc=20)
     
-   # x_train, y_train, x_test, y_test = U.get_mnist()
+    x_train, y_train, x_test, y_test = U.get_mnist()
 
    # model, encoder, decoder = get_ML_models()
-    #model, encoder, decoder = get_ML_ensemble()
+   # model, encoder, decoder = get_ML_ensemble()
    # _, encoder, decoder = define_VAE()
    # encoder.load_weights('save/enc_weights.h5')
    # decoder.load_weights('save/dec_weights.h5')
@@ -233,7 +235,7 @@ if __name__ == '__main__':
 
     
     
-    #proj_x_train = encoder.predict(x_train)
+    proj_x_train = encoder.predict(x_train)
    # model = EnsembleWrapper([model1, model2])
 
     zmin, zmax = -10,10
@@ -247,11 +249,11 @@ if __name__ == '__main__':
     make_plot(proj_x_train,
               y_train,
               [zmin, zmax, zmin, zmax],
-              plot_ent,
+              plot_bald,
               decoder,
               model,
     )
     
     print('done')              
-    #plt.savefig('overleaf-paper/figures/ML_dropout_uncertainty.pdf')
+    plt.savefig('overleaf-paper/figures/model_ensemble_bald.pdf')
     plt.show()
