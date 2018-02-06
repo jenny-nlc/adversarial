@@ -13,6 +13,67 @@ from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from keras.models import Sequential
 from .concrete_dropout import ConcreteDropout
 
+def imagenet_deprocess(x, mode='caffe'):
+    """
+    Reverses the transformation that imagenet does on the images. This
+    is the inverse function of the keras utility which can be found at
+    https://github.com/keras-team/keras/blob/master/keras/applications/i
+    magenet_utils.py 
+    """
+    data_format = K.image_data_format()
+
+    if mode == 'tf':
+        x /= 127.5
+        x -= 1.
+        return x
+
+    if mode == 'torch':
+        x /= 255.
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
+    else:
+        mean = [103.939, 116.779, 123.68]
+        std = None
+
+    # Zero-center by mean pixel
+    if data_format == 'channels_first':
+        if x.ndim == 3:
+            x[0, :, :] += mean[0]
+            x[1, :, :] += mean[1]
+            x[2, :, :] += mean[2]
+            if std is not None:
+                x[0, :, :] *= std[0]
+                x[1, :, :] *= std[1]
+                x[2, :, :] *= std[2]
+        else:
+            x[:, 0, :, :] += mean[0]
+            x[:, 1, :, :] += mean[1]
+            x[:, 2, :, :] += mean[2]
+            if std is not None:
+                x[:, 0, :, :] *= std[0]
+                x[:, 1, :, :] *= std[1]
+                x[:, 2, :, :] *= std[2]
+    else:
+        x[..., 0] += mean[0]
+        x[..., 1] += mean[1]
+        x[..., 2] += mean[2]
+        if std is not None:
+            x[..., 0] *= std[0]
+            x[..., 1] *= std[1]
+            x[..., 2] *= std[2]
+    #undo the channel switch to go back to RGB
+    if data_format == 'channels_first':
+        # 'BGR'->'RGB'
+        if x.ndim == 3:
+            x = x[::-1, ...]
+        else:
+            x = x[:, ::-1, ...]
+    else:
+        # 'BGR'->'RGB'
+        x = x[..., ::-1]
+    x = np.clip(x, 0, 225)
+    return x.astype(np.uint8)
+
 def load_cdropout_model():
     model = Sequential()
 
