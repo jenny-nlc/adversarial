@@ -91,5 +91,5 @@ if __name__ == '__main__':
             epochs=epochs,
             validation_data=(x_test, y_test),
             callbacks= [TrackConcreteDropoutP(model)]) #check the p values of the c d are converging.
-
-    save_model(model, 'save/mnist_cdrop_cnn.h5')
+    fname = U.gen_save_name('save/mnist_cdrop_cnn_run.h5')
+    save_model(model, fname)
