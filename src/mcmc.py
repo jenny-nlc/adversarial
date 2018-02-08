@@ -43,8 +43,9 @@ def HMC_ensemble_run(model: keras.models.Model,
     ensemble = []
     accept_n = 0
     while len(ensemble) < N_mc:
-        if verbose and i % 1000 == 0:
+        if verbose and i % 100 == 0:
             print("iter: ", i)
+            print('accuracy :', np.mean(model.predict(x_train).argmax(axis=1) == y_train.argmax(axis=1)))
         i += 1 
         obj, gs = get_loss_and_grads(x_train, y_train)
         losses.append(obj)
@@ -58,7 +59,7 @@ def HMC_ensemble_run(model: keras.models.Model,
         # store the values of the weights in case we need to go back
         for t in range(tau):
             for p, g in zip(ps, gs):
-                p - .5 * ep * g
+                p -= .5 * ep * g
 
             for w, p in zip(ws, ps):
                 w += ep * p
@@ -69,7 +70,7 @@ def HMC_ensemble_run(model: keras.models.Model,
             obj, gs = get_loss_and_grads(x_train, y_train)
 
             for p, g in zip(ps, gs):
-                p - .5 * ep * g
+                p -= .5 * ep * g
 
         H_new = .5 * sum([np.sum(p ** 2) for p in ps]) + obj
 
@@ -168,24 +169,17 @@ if __name__ == "__main__":
     plt.show()
 
     model = keras.models.Sequential()
-    model.add(keras.layers.Dense(1,
+    model.add(keras.layers.Dense(2,
                                  input_shape=(2,),
                                  activation='sigmoid',
                                  kernel_regularizer=keras.regularizers.l2()))
+
+    labels = keras.utils.to_categorical(labels, num_classes=2)
     xx, yy = np.meshgrid(np.linspace(-3,3,100), np.linspace(-3,3,100))
     plot_x = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
-
-    mc_preds = HMC(model,
-                   keras.losses.binary_crossentropy,
-                   data,
-                   labels,
-                   plot_x,
-                   2,
-                   10001,
-                   1,
-                   10000,
-                   1)
-
+    model.compile(loss=keras.losses.categorical_crossentropy, optimizer='sgd')
+    weights, losses, ws, accept_n = HMC_ensemble_run(model,data, labels, 10, 0.1, 150, 1000, 100, return_extra=True, verbose=True)
+    mc_preds = HMC_ensemble_predict(model, weights, plot_x)
     plt.figure()
     plt.contourf(xx, yy, mc_preds.mean(axis=0).reshape(xx.shape))
     plt.scatter(data[:, 0], data[:, 1], c=labels.flatten())
