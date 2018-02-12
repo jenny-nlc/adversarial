@@ -1,23 +1,30 @@
 import os
+import pickle
 
 import keras
 import numpy as np
 from keras import backend as K
+from keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
+from keras.models import Sequential, load_model
 from matplotlib import pyplot as plt
+from matplotlib import gridspec
 from scipy.stats import norm
 
 import src.utilities as U
+import src.mcmc as mcmc
+
 from cleverhans import attacks
 from cleverhans.model import CallableModelWrapper
 from load_dropout_model import load_drop_model
 from train_cdropout_3s_7s import define_cdropout_3s_7s, mnist_to_3s_and_7s
 from train_mnist_vae import define_VAE
-from keras.models import load_model
-
 plt.rcParams['figure.figsize'] = 8, 8
 #use true type fonts only
 plt.rcParams['pdf.fonttype'] = 42 
 plt.rcParams['ps.fonttype'] = 42 
+
+def H(x):
+    return - np.sum( x * np.log(x + 1e-8), axis=-1)
 
 def visualise_latent_space(decoder, n_grid=10):
     grid = norm.ppf(np.linspace(0.01,0.99, n_grid))
@@ -47,7 +54,54 @@ def get_uncertainty_samples(mc_model,encoder, decoder, extent, n_grid=100):
     X = decoder.predict(Z) #produce corresponding images for the latent space grid
     preds,entropy, bald = mc_model.get_results(X)
     return preds, entropy.reshape(xx.shape), bald.reshape(xx.shape) 
+def get_HMC_models():
+    _, encoder, decoder = define_VAE()
+    encoder.load_weights('save/enc_weights.h5')
+    decoder.load_weights('save/dec_weights.h5')
 
+    input_shape = (28, 28, 1)
+    num_classes = 10
+    
+    model = Sequential()
+    model.add(Conv2D(32, kernel_size=(3, 3),
+                    activation='relu',
+                    input_shape=input_shape))
+    model.add(Conv2D(64, (3, 3), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    model.add(Dense(num_classes, activation='softmax'))
+
+    model.compile(loss=keras.losses.categorical_crossentropy,
+                optimizer=keras.optimizers.SGD(),
+                metrics=['accuracy'])
+
+    class HMC_model():
+        def __init__(self,model, ensemble_weights):
+            self.m = model
+            self.ws = ensemble_weights
+        def get_results(self,X):
+            mc_preds = mcmc.HMC_ensemble_predict(self.m, self.ws, X)
+            preds = np.mean(mc_preds, axis=0)
+            predictive_entropy = H(preds)
+            expected_entropy = np.mean(H(mc_preds), axis=0)
+            minfo = predictive_entropy - expected_entropy
+            return preds, predictive_entropy, minfo
+        def predict(self,X):
+            mc_preds = mcmc.HMC_ensemble_predict(self.m, self.ws, X)
+            preds = np.mean(mc_preds, axis=0)
+            return preds
+    #load Y's weights
+    with open('save/mnist_hmc_ensemble_run.pkl', 'rb') as pkl:
+        weights = pickle.load(pkl)
+
+    hmc_model = HMC_model(model, weights)
+    return hmc_model, encoder, decoder
+
+
+        
+    
+    
 def get_models_3s_7s():
     _, encoder, decoder = define_VAE()
     encoder.load_weights('save/enc_weights_3s_7s.h5')
@@ -176,6 +230,7 @@ def make_interactive_plot(proj_x,
             print("Predictive Entropy: {}".format(entropy[0]))
             print("BALD Score:         {}".format(bald[0]))
             proj.set_data(dream.squeeze())
+            print(z1, z2)
             plt.draw()
             last_sample = dream
     f.canvas.mpl_connect('button_press_event', on_click)
@@ -185,7 +240,6 @@ def make_plot(proj_x,
               extent,
               plot_bg,
               decoder,
-              model,
               title="",
               bgcmap='gray',
               bgalpha=0.9,
@@ -211,18 +265,60 @@ def make_plot(proj_x,
     ax.set_ylabel('Second Latent Dimension')
     ax.set_title(title)
 
+def make_starred_plot(proj_x,
+                      proj_y,
+                      extent,
+                      plot_bg,
+                      decoder,
+                      stars,
+                      title="",
+                      bgcmap='gray',
+                      bgalpha=0.9,
+                      sccmap='Set3'):
+    f = plt.figure()
+    gs = gridspec.GridSpec(3, 3)
+
+    #plot the image
+    ax1 = plt.subplot(gs[:,:2])
+    ax1.scatter(proj_x[:,0],
+                proj_x[:,1],
+                c = proj_y.argmax(axis=1),
+                marker=',',
+                s=1,
+                cmap=sccmap,
+               alpha=0.1
+    )
+
+    ax1.imshow(plot_bg,
+                 cmap=bgcmap,
+                 origin='lower',
+                 alpha=bgalpha,
+                 extent=extent,
+    )
+    ax1.set_xlabel('First Latent Dimension')
+    ax1.set_ylabel('Second Latent Dimension')
+    ax1.set_title(title)
+
+    for i, st in enumerate(stars):
+        ax = plt.subplot(gs[i, 2])
+        ax.imshow(decoder.predict(st.reshape(1,-1)).squeeze(), cmap='gray_r')
+        ax1.scatter(st[0], st[1], marker=(6, 1,0), s=50, label='ABC'[i])
+    ax1.legend()   
+
+    return
 
 if __name__ == '__main__':
 
     #model, encoder, decoder = get_models_3s_7s()
     
     #x_train, y_train, x_test, y_test = mnist_to_3s_and_7s(U.get_mnist())
-#    model, encoder, decoder = get_models()
-    model, encoder, decoder = get_model_ensemble(n_mc=20)
+    # model, encoder, decoder = get_models()
+    model, encoder, decoder = get_HMC_models()
+    #model, encoder, decoder = get_model_ensemble(n_mc=20)
     
     x_train, y_train, x_test, y_test = U.get_mnist()
 
-   # model, encoder, decoder = get_ML_models()
+   #  model, encoder, decoder = get_ML_models()  
    # model, encoder, decoder = get_ML_ensemble()
    # _, encoder, decoder = define_VAE()
    # encoder.load_weights('save/enc_weights.h5')
@@ -239,21 +335,28 @@ if __name__ == '__main__':
    # model = EnsembleWrapper([model1, model2])
 
     zmin, zmax = -10,10
-    n_grid = 100
+    n_grid = 40
     preds, plot_ent, plot_bald = get_uncertainty_samples(model,
                                                          encoder,
                                                          decoder,
                                                          [zmin, zmax],
                                                          n_grid=n_grid)
     
-    make_plot(proj_x_train,
+    make_interactive_plot(proj_x_train,
               y_train,
               [zmin, zmax, zmin, zmax],
               plot_bald,
               decoder,
               model,
     )
-    
+
+    make_starred_plot(proj_x_train,
+                      y_train,
+                      [zmin, zmax, zmin, zmax],
+                      plot_ent,
+                      decoder,
+              np.array([[-.98,2.3], [-.73,1.52], [5,4]])
+    )
     print('done')              
-    plt.savefig('overleaf-paper/figures/model_ensemble_bald.pdf')
+    #plt.savefig('overleaf-paper/figures/model_ensemble_bald.pdf')
     plt.show()
