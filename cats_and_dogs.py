@@ -83,14 +83,22 @@ def train(X, Y, X_val, Y_val):
                   metrics=['accuracy'],optimizer='adam')
 
     #sanity check; just train for now
-    model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val))
+    model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val), shuffle='batch')
     return model
 
 if __name__ == '__main__':
-   x_tr,y_tr, x_te, y_te = load_or_create_dataset()
-   #model = train(x_tr,y_tr, x_te, y_te)
-   #model.save_weights('save/cats_dogs_vgg_w.h5')
-   model = define_model()
-   model.load_weights('save/cats_dogs_vgg_w.h5')
-   y = model.predict(x_te)
+    #x_tr,y_tr, x_te, y_te = load_or_create_dataset()
+    with h5py.File(H5PATH,'r') as f:
+        x_tr = f['train']['X']
+        y_tr = f['train']['Y']
+
+        x_te = f['test']['X']
+        y_te = f['test']['Y']
+        
+        model = train(x_tr,y_tr, x_te, y_te)
+    fname = U.gen_save_name('save/cats_dogs_vgg_w_run.h5')
+    model.save_weights(fname)
+    # model = define_model()
+    # model.load_weights('save/cats_dogs_vgg_w.h5')
+    # y = model.predict(x_te)
 
