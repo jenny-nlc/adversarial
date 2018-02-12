@@ -4,6 +4,7 @@ from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten
 import src.utilities as U
 import src.mcmc as mcmc
+import pickle
 
 def test_run(model, x_train, y_train, N_mc, ep, tau, burn_in, sample_every):
     """
@@ -11,7 +12,7 @@ def test_run(model, x_train, y_train, N_mc, ep, tau, burn_in, sample_every):
     """
 
     ensemble, losses, weights, accept_ratio = mcmc.HMC_ensemble_run(model,x_train, y_train, N_mc, ep, tau, burn_in, sample_every,
-    return_extra=True, verbose=True)
+    return_extra=True, verbose=True, verbose_n = 1)
     #the sampled weights, the entire loss history (so you can look at the autocorrelation), the entire weight history, and the ratio of accepted steps
     return ensemble, losses, weights, accept_ratio
 
@@ -40,29 +41,27 @@ if __name__ == '__main__':
     x_train = x_train[:1000]
     y_train = y_train[:1000]
 
-    epsilon = 1e-4 # step size
-    tau = 5 # number of steps to take before the reject/accept step
-    burn_in = 1000 
-    sample_every = 1000
-    samples_per_init = 1 #samples to take before restarting 
+    epsilon = 2e-4 # step size
+    tau = 200 # number of steps to take before the reject/accept step
+    burn_in = 100
+    sample_every = 30
     N_ensemble = 20 #number of models to create
-
-    ensemble, losses, weights, accept_ratio = test_run(model,x_train, y_train, 1, epsilon, tau, burn_in,sample_every)
-    print('Accept ratio:', accept_ratio) 
+    N_restarts = 5 #use multiple intitialisations
+    # use multiple intitialisations
+    ensemble = []
     with open('save/tmp/losses.dat','w') as f:
-        for l in losses:
-            print(l, file=f)
+        print('',f)
+    
+    for i in range(N_restarts):
+        N = N_ensemble // N_restarts
+        mcmc.reset_model(model)
+        es, losses, weights, accept_ratio = test_run(model,x_train, y_train, N, epsilon, tau, burn_in,sample_every)
+        ensemble += es       
+        print('Accept ratio:', accept_ratio) 
+        with open('save/tmp/losses.dat','a') as f:
+            for l in losses:
+                print(l, file=f)
 
-
-#   ensemble = mcmc.HMC_ensemble(model,
-#                           x_train,
-#                           y_train,
-#                           N_mc = N_ensemble,
-#                           ep = epsilon,
-#                           tau = tau,
-#                           burn_in = burn_in,
-#                           sample_every = sample_every,
-#                           samples_per_init = samples_per_init,
-#                           verbose=True):
-
- 
+    name = U.gen_save_name('save/mnist_hmc_ensemble_run.pkl')
+    with open(name, 'wb') as f:
+        pickle.dump(ensemble, f)
