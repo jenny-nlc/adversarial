@@ -1,12 +1,15 @@
 import keras
 import numpy as np
-from keras.applications.vgg16 import VGG16, preprocess_input, decode_predictions
+from keras.applications.vgg16 import VGG16
+from keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
 from keras.layers import Dropout, Dense
 import src.utilities as U
 import os
 import h5py
 from keras import backend as K
+
 H5PATH='/data-local/lsgs/cats_dogs.h5'
+
 def load_or_create_dataset():
     if not os.path.exists(H5PATH):
         cats = U.load_jpgs('/data-local/lsgs/PetImages/Cat')
@@ -77,6 +80,19 @@ def define_model():
     
     return model
 
+def define_model_resnet():
+    K.set_learning_phase(True)
+    rn50 = ResNet50(weights = 'imagenet', include_top='False')
+    a = Dropout(rate=0.5)(rn50.output)
+    a = Dense(2, activation='softmax')(a)
+    
+    model = keras.models.Model(inputs = rn50.input, outputs = a)
+    
+    #freeze resnet layers
+    for layer in rn50.layers:
+        layer.trainable = False
+    return model
+
 def train(X, Y, X_val, Y_val):
     model = define_model()
     model.compile(loss='categorical_crossentropy',
@@ -87,10 +103,21 @@ def train(X, Y, X_val, Y_val):
     return model
 
 if __name__ == '__main__':
-   x_tr,y_tr, x_te, y_te = load_or_create_dataset()
-   #model = train(x_tr,y_tr, x_te, y_te)
-   #model.save_weights('save/cats_dogs_vgg_w.h5')
-   model = define_model()
-   model.load_weights('save/cats_dogs_vgg_w.h5')
-   y = model.predict(x_te)
+    mode = 'rnet'
+    if mode == 'vgg':
 
+        X,Y, X_val, Y_val = load_or_create_dataset()
+        model = define_model()
+        model.compile(loss='categorical_crossentropy',
+                  metrics=['accuracy'],optimizer='adam')
+        model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val))
+        model.save_weights('save/cats_dogs_vgg_w.h5')
+
+    elif mode == 'rnet':
+
+        X,Y, X_val, Y_val = load_or_create_dataset()
+        model = define_model_resnet()
+        model.compile(loss='categorical_crossentropy',
+                  metrics=['accuracy'],optimizer='adam')
+        model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val))
+        model.save_weights('save/cats_dogs_rn50_w.h5')
