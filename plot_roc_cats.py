@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     #
     plt.figure(2)
-    imsdiff = ims - np.concatenate([ims[:, :224, :] for _ in range(3)], axis=1)
+    imsdiff = ims - np.concatenate([ims[:, :224, :] for _ in range(ims.shape[1] // 224)], axis=1)
     imsdiff[:, :224, :] = ims[:, :224, :]
     plt.imshow(imsdiff)
     plt.axis('off')
@@ -38,30 +38,29 @@ if __name__ == '__main__':
 
     plt.figure(3)
     # plot the ROC curves
-    plt.plot(db['Deterministic Model']['entropy_fpr'],
-             db['Deterministic Model']['entropy_tpr'],
-             label='Entropy (deterministic model)')
+    for m in [k for k in db.keys() if 'Model' in k]:
+        print('AUC entropy', db[m]['entropy_AUC'].value)
+        print('AUC bald', db[m]['bald_AUC'].value)
+        plt.plot(db[m]['entropy_fpr'],
+                 db[m]['entropy_tpr'],
+                 label='Entropy {}'.format(m))
+           
+        plt.plot(db[m]['entropy_fpr_succ'],
+                 db[m]['entropy_tpr_succ'],
+                 label='Entropy {} (succ) '.format(m))
     
-    plt.plot(db['MC Model']['entropy_fpr'],
-             db['MC Model']['entropy_tpr'],
-             label='Entropy (MC model)')
+        if 'Deterministic' in m:
+            continue
+        
+        plt.plot(db[m]['bald_fpr'],
+                 db[m]['bald_tpr'],
+                 label='Mutual Information {}'.format(m))
 
-    plt.plot(db['MC Model']['bald_fpr'],
-             db['MC Model']['bald_tpr'],
-             label='Mutual Information (MC model)')
- 
-    plt.plot(db['Deterministic Model']['entropy_fpr_succ'],
-             db['Deterministic Model']['entropy_tpr_succ'],
-             label='Entropy (deterministic model) (succ) ')
-    
-    plt.plot(db['MC Model']['entropy_fpr_succ'],
-             db['MC Model']['entropy_tpr_succ'],
-             label='Entropy (MC model) (succ) ')
+        plt.plot(db[m]['bald_fpr_succ'],
+                 db[m]['bald_tpr_succ'],
+                 label='Mutual Information {} (succ) '.format(m))
 
-    plt.plot(db['MC Model']['bald_fpr_succ'],
-             db['MC Model']['bald_tpr_succ'],
-             label='Mutual Information (MC model) (succ) ')
-    plt.plot(np.linspace(0,1,10), np.linspace(0,1,10), color='k', linestyle='--')
+        plt.plot(np.linspace(0,1,10), np.linspace(0,1,10), color='k', linestyle='--')
     plt.xlabel('FPR')
     plt.ylabel('TPR')
     plt.legend()
@@ -83,10 +82,16 @@ if __name__ == '__main__':
     plt.xlabel('Recall')
     plt.ylabel('Precision')
     plt.legend()
-
+   
+    attack_info = db.get('attack')
+    if attack_info  is None:
+        attack = 'fgm'
+    else:
+        attack = attack_info.value
+    print('Attack: ', attack)
     print('Accuracy det model: ',db['Deterministic Model']['adv_accuracy'].value)
     print('Accuracy mc model: ',db['MC Model']['adv_accuracy'].value)
+    
     plt.show()
 
-    import pdb; pdb.set_trace()
     db.close()
