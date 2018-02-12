@@ -59,15 +59,15 @@ if __name__ == '__main__':
 
 
     ax2 = plt.subplot(gs[2])
-    ax2.plot(z_entropy, label='latent space')
-    ax2.plot(x_entropy, label='image space')
+    ax2.plot(z_entropy, label='Latent Space', c ='r')
+    ax2.plot(x_entropy, label='Image Space', c = 'b')
     ax2.legend()
     
     ax3 = plt.subplot(gs[3])
-    ax3.plot(z_bald, label='latent space')
-    ax3.plot(x_bald, label='image space')
+    ax3.plot(z_bald, label='Latent Space', c = 'r')
+    ax3.plot(x_bald, label='Image Space', c = 'b')
     ax3.legend()
 
-
+    plt.savefig('overleaf-paper/figures/bald_interpolation.png')
     plt.show()
 
