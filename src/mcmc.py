@@ -21,11 +21,15 @@ def HMC_ensemble_run(model: keras.models.Model,
             sample_every: int,
             return_extra=False,
             verbose=True,
+            verbose_n = 100,
             ):
     """
     Takes a keras model and a dataset (x_train, y_train) and returns a list of numpy
     arrays to be used as weights for an ensemble predictor.
     """
+    step_size = ep
+    n_steps = tau
+
     Ws = model.weights
     lossfn = model.loss #this is kinda cheeky
     X = model.input
@@ -42,13 +46,29 @@ def HMC_ensemble_run(model: keras.models.Model,
     weights = []
     ensemble = []
     accept_n = 0
+    ep_lo = 0.8 * step_size
+    ep_hi = 1.2 * step_size
+
+    tau_lo = int(0.5 * n_steps)
+    tau_hi = int(1.5 * n_steps)
+    
+    obj = 0
+
     while len(ensemble) < N_mc:
-        if verbose and i % 100 == 0:
-            print("iter: ", i)
-            print('accuracy :', np.mean(model.predict(x_train).argmax(axis=1) == y_train.argmax(axis=1)))
-        i += 1 
+        ep = ep_lo + (ep_hi - ep_lo) * np.random.random()
+        tau = np.random.randint(tau_lo, high=tau_hi)
+
         obj, gs = get_loss_and_grads(x_train, y_train)
         losses.append(obj)
+
+
+        if verbose and i % verbose_n == 0:
+            acc = np.mean(model.predict(x_train).argmax(axis=1) == y_train.argmax(axis=1))
+            accept_ratio = accept_n / i if i > 0 else 0
+            print("iter: ", i, 'accuracy :', acc, 'loss: ', obj, 'accept_ratio: ', accept_ratio)
+
+        i += 1 
+
         ps = [np.random.normal(size=w.shape) for w in Ws]  # momentum variables
 
         H = .5 * sum([np.sum(p ** 2) for p in ps]) + obj
