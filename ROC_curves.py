@@ -62,6 +62,9 @@ def get_models():
     model = U.MCEnsembleWrapper(ms, n_mc=20)
     models.append(('Ensemble CNN', model))
 
+    from latent_plots import get_HMC_models
+    model, _, _ = get_HMC_models()
+    models.append(('HMC Model', model))
     return models
 
 def plot(models, fpr_entropies, tpr_entropies, fpr_balds, tpr_balds, prec_entropies, rec_entropies, prec_balds, rec_balds):
