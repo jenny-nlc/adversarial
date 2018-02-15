@@ -18,11 +18,10 @@ def define_CVAE(optim='adagrad', latent_dim=2):
     input_flatten = Flatten()(input_x)
     x = keras.layers.concatenate([input_flatten, input_c]) # input including the condition variable
 
-    enc_1 = Dense(400, activation='elu')(x)
-    enc_2 = Dense(256, activation = 'elu')(enc_1)
+    enc_h = Dense(512, activation='elu')(x)
 
-    z_mu = Dense(latent_dim)(enc_2)
-    z_logsigma = Dense(latent_dim)(enc_2)
+    z_mu = Dense(latent_dim)(enc_h)
+    z_logsigma = Dense(latent_dim)(enc_h)
 
     encoder = Model(inputs=[input_x, input_c], outputs=z_mu) #represent the latent space by the mean
 
@@ -33,9 +32,8 @@ def define_CVAE(optim='adagrad', latent_dim=2):
 
     latent_input = keras.layers.Input(shape=(latent_dim,))
     dec_input = keras.layers.concatenate([latent_input, input_c])
-    dec_1 = Dense(256, activation='elu')(dec_input)
-    dec_2 = Dense(400, activation='elu')(dec_1)
-    dec_output = Dense(784, activation='sigmoid')(dec_2) 
+    dec_h = Dense(512, activation='elu')(dec_input)
+    dec_output = Dense(784, activation='sigmoid')(dec_h) 
 
     dec_reshaped = Reshape((28,28,1))(dec_output)
     decoder = Model(inputs=[latent_input, input_c],outputs=dec_reshaped)
@@ -74,10 +72,10 @@ if __name__ == '__main__':
 
     VAE.fit([x_train,y_train], x_train,
             epochs=50,
-            batch_size=BATCH_SIZE
-            validation_data=([x_test, y_test], y_test]
-)
-    encoder.save_weights('save/mmnist_weights_latent_dim_' + str(latent_dim) + '.h5')
-    decoder.save_weights('save/mmnist_weights_latent_dim_' + str(latent_dim) + '.h5')
+            batch_size=BATCH_SIZE,
+            validation_data=([x_test, y_test], x_test))
+
+    encoder.save_weights('save/mmnist_enc_weights_latent_dim_' + str(latent_dim) + '.h5')
+    decoder.save_weights('save/mmnist_dec_weights_latent_dim_' + str(latent_dim) + '.h5')
 
        
