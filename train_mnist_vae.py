@@ -24,7 +24,7 @@ def define_VAE(optim='adagrad', latent_dim=2):
 
     def sample_z(args):
         mu, logsigma = args
-        return  0.5 * K.exp(logsigma / 2) * K.random_normal(shape=(K.shape(mu)[0], 2)) + mu
+        return  0.5 * K.exp(logsigma / 2) * K.random_normal(shape=(K.shape(mu)[0], latent_dim)) + mu
     z = Lambda(sample_z, output_shape=(latent_dim,))([z_mu, z_logsigma]) 
 
     dec_input = keras.layers.Input(shape=(latent_dim,))
@@ -73,6 +73,7 @@ if __name__ == '__main__':
 
         VAE, encoder, decoder = define_VAE(
             optim=keras.optimizers.Adam(),
+            latent_dim=latent_dim,
         )
 
         VAE.fit(x_train, x_train,
