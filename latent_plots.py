@@ -61,25 +61,32 @@ def get_HMC_models():
 
     input_shape = (28, 28, 1)
     num_classes = 10
-    
-    model = Sequential()
-    model.add(Conv2D(32, kernel_size=(3, 3),
-                    activation='relu',
-                    input_shape=input_shape))
-    model.add(Conv2D(64, (3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Flatten())
-    model.add(Dense(128, activation='relu'))
-    model.add(Dense(num_classes, activation='softmax'))
 
-    model.compile(loss=keras.losses.categorical_crossentropy,
-                optimizer=keras.optimizers.SGD(),
-                metrics=['accuracy'])
+    def modeldef():
+        model = Sequential()
+        model.add(Conv2D(32, kernel_size=(3, 3),
+                        activation='relu',
+                        input_shape=input_shape))
+        model.add(Conv2D(64, (3, 3), activation='relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Flatten())
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(num_classes, activation='softmax'))
+
+        model.compile(loss=keras.losses.categorical_crossentropy,
+                    optimizer=keras.optimizers.SGD(),
+                    metrics=['accuracy'])
+        return model
 
     class HMC_model():
-        def __init__(self,model, ensemble_weights):
-            self.m = model
+        def __init__(self, ensemble_weights):
+            self.m = modeldef()
             self.ws = ensemble_weights
+            self.ms = [modeldef() for _ in self.ws]
+            for model, wlist in zip(self.ms,self.ws):
+                for tensor, weight in zip(model.weights, wlist):
+                    K.set_value(tensor, weight)
+                    
         def get_results(self,X):
             mc_preds = mcmc.HMC_ensemble_predict(self.m, self.ws, X)
             preds = np.mean(mc_preds, axis=0)
@@ -87,15 +94,23 @@ def get_HMC_models():
             expected_entropy = np.mean(H(mc_preds), axis=0)
             minfo = predictive_entropy - expected_entropy
             return preds, predictive_entropy, minfo
+        
         def predict(self,X):
             mc_preds = mcmc.HMC_ensemble_predict(self.m, self.ws, X)
             preds = np.mean(mc_preds, axis=0)
             return preds
-    #load Y's weights
-    with open('save/mnist_hmc_ensemble_run.pkl', 'rb') as pkl:
-        weights = pickle.load(pkl)
 
-    hmc_model = HMC_model(model, weights)
+        def __call__(self, X):
+            """get predictions on a symbolic tensor; this is a little inefficient in terms of space"""
+            return K.mean( K.stack([ model(X) for model in self.ms]), axis=0)
+                
+    #load Y's weights
+    with open('save/mnist_hmc_ensemble_run_1.pkl', 'rb') as pkl:
+        weights = pickle.load(pkl)
+    with open('save/mnist_hmc_ensemble_run.pkl', 'rb') as pkl:
+        weights += pickle.load(pkl)
+
+    hmc_model = HMC_model(weights)
     return hmc_model, encoder, decoder
 
 
