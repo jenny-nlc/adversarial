@@ -55,6 +55,14 @@ def define_CVAE(optim='adagrad', latent_dim=2):
 
     return VAE, encoder, decoder
 
+def generate(decoder, latent_dim, n_samples=10):
+    z = np.random.randn(n_samples, latent_dim)
+    classes = np.random.randint(0, high=10, size=n_samples)
+    cond = keras.utils.to_categorical(classes, num_classes=10)
+
+    samples = decoder.predict([z, cond])
+    return samples
+
 if __name__ == '__main__':
     latent_dim = 64
     x_train, y_train, x_test, y_test = U.get_mnist()
