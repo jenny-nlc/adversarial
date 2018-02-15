@@ -69,7 +69,7 @@ if __name__ == '__main__':
             batch_size=BATCH_SIZE
             validation_data=([x_test, y_test], y_test]
 )
-    encoder.save_weights('save/enc_weights_latent_dim_' + str(latent_dim) + '.h5')
-    decoder.save_weights('save/dec_weights_latent_dim_' + str(latent_dim) + '.h5')
+    encoder.save_weights('save/mmnist_weights_latent_dim_' + str(latent_dim) + '.h5')
+    decoder.save_weights('save/mmnist_weights_latent_dim_' + str(latent_dim) + '.h5')
 
        
