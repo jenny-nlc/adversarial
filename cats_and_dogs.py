@@ -99,25 +99,27 @@ def train(X, Y, X_val, Y_val):
                   metrics=['accuracy'],optimizer='adam')
 
     #sanity check; just train for now
-    model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val))
+    model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val), shuffle='batch')
     return model
 
 if __name__ == '__main__':
     mode = 'rnet'
     if mode == 'vgg':
-
-        X,Y, X_val, Y_val = load_or_create_dataset()
         model = define_model()
-        model.compile(loss='categorical_crossentropy',
-                  metrics=['accuracy'],optimizer='adam')
-        model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val))
-        model.save_weights('save/cats_dogs_vgg_w.h5')
-
+        wname = 'save/cats_dogs_vgg_w_run/h5'
     elif mode == 'rnet':
-
-        X,Y, X_val, Y_val = load_or_create_dataset()
         model = define_model_resnet()
-        model.compile(loss='categorical_crossentropy',
+        wname = 'save/cats_dogs_rn50_w_run/h5'
+
+    model.compile(loss='categorical_crossentropy',
                   metrics=['accuracy'],optimizer='adam')
-        model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val))
-        model.save_weights('save/cats_dogs_rn50_w.h5')
+    with h5py.File(H5PATH,'r') as f:
+        x_tr = f['train']['X']
+        y_tr = f['train']['Y']
+
+        x_te = f['test']['X']
+        y_te = f['test']['Y']
+        model.fit(x_tr, y_tr, epochs=10,  validation_data=(x_te, y_te))
+        name = U.gen_save_name(wname)
+        model.save_weights(name)
+
