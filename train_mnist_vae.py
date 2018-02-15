@@ -68,6 +68,7 @@ if __name__ == '__main__':
         decoder.save_weights('save/dec_weights_3s_7s.h5')
 
     else:
+        latent_dim = 64
         x_train, y_train, x_test, y_test = U.get_mnist()
 
         VAE, encoder, decoder = define_VAE(
@@ -79,7 +80,7 @@ if __name__ == '__main__':
                 batch_size=BATCH_SIZE,
                 validation_data=(x_test,x_test))
 
-        encoder.save_weights('save/enc_weights.h5')
-        decoder.save_weights('save/dec_weights.h5')
+        encoder.save_weights('save/enc_weights_latent_dim_' + str(latent_dim) + '.h5')
+        decoder.save_weights('save/dec_weights_latent_dim_' + str(latent_dim) + '.h5')
 
        
