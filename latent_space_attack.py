@@ -12,6 +12,8 @@ from load_dropout_model import load_drop_model
 from train_cdropout_3s_7s import define_cdropout_3s_7s, mnist_to_3s_and_7s
 from train_mnist_vae import define_VAE
 from scipy import optimize
+from latent_plots import get_HMC_models
+
 
 plt.rcParams['figure.figsize'] = 3, 3
 #use true type fonts only
@@ -130,13 +132,15 @@ class LatentSpaceAttack:
             
 if __name__ == '__main__':
 
-    model, encoder, decoder = get_models()
+    model, encoder, decoder = get_HMC_models()
     
     x_train, y_train, x_test, y_test = U.get_mnist()
  
     x_train, y_train, x_test, y_test = U.get_mnist()
 
     lsa = LatentSpaceAttack(model, decoder, batch_size = 50)
-    ims = lsa.generate_random(n_examples=1)
+    ims = lsa.generate_random(n_examples=5)
+    print(model.predict(ims).max())
     plt.imshow(np.concatenate([x for x in ims], axis=1).squeeze(), cmap='gray_r')
+    
 
