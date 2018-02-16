@@ -76,6 +76,24 @@ def make_grid(im_batch, rect):
     ims = np.concatenate(ims, axis=1)
     return ims
 
+def visualise_latent_space(decoder, n_grid=10, target= 2):
+
+    grid = norm.ppf(np.linspace(0.01,0.99, n_grid))
+
+    xx, yy = np.meshgrid(grid, grid)
+
+    X = np.concatenate([xx.reshape(-1,1), yy.reshape(-1,1)], axis=1)
+    y = keras.utils.to_categorical([target for _ in range(X.shape[0])], num_classes=10)
+    Z = decoder.predict([X, y])
+
+    Z = Z.reshape(n_grid, n_grid, 28,28)
+
+    imgrid = np.concatenate(
+        [np.concatenate([Z[i,j] for i in range(n_grid)], axis=1)
+         for j in range(n_grid)], axis=0)
+    plt.imshow(imgrid, cmap='gray_r')
+
+
 
 def plot_examples(decoder, x_train, y_train):
     
