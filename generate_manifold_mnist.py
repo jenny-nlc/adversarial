@@ -170,3 +170,4 @@ if __name__ == '__main__':
     encoder.save_weights('save/mmnist_enc_weights_latent_dim_' + str(latent_dim) + '.h5')
     decoder.save_weights('save/mmnist_dec_weights_latent_dim_' + str(latent_dim) + '.h5')
 
+       
