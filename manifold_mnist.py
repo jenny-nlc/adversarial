@@ -7,13 +7,18 @@ from sklearn.mixture import GaussianMixture
 
 from matplotlib import pyplot as plt
 
+def binary_crossentropy(y, y_):
+    return y * np.log(y) + (1 - y) * np.log(1 - y_)
+
 def hmc_sample(x,  
                obj, 
                tau=100,
                epsilon=1e-2,
                n_samps=100,
                burn_in=100,
-               sample_every=10):
+               sample_every=10,
+               verbose = False
+):
     
     #assume x is a 1-d vector for now
 
@@ -62,7 +67,8 @@ def hmc_sample(x,
         if i > burn_in and i % sample_every == 0:
             samples.append(x)
         i += 1
-        print('iter:',i, 'Energy:', E, 'grad:', jac, 'x:', x) # make this optional?  
+        if verbose:
+            print('iter:',i, 'Energy:', E, 'grad:', jac, 'x:', x)
     return np.array(samples).squeeze(), np.array(losses).squeeze()
 
     
@@ -73,12 +79,7 @@ if __name__ == '__main__':
     _, _, decoder = g_mmnist.define_CVAE()
     #load model
     decoder.load_weights('save/mmnist_dec_weights_latent_dim_2.h5')
-
-    mmnist = h5py.File('save/manifold_mnist.h5', 'r')
-
-    # define the energy of the posteior
-    image = mmnist['x_train'][0]
-    
+   
     def make_objective(image, class_target):
         # get gradient from keras model
         z_t, class_t = decoder.inputs
@@ -99,7 +100,6 @@ if __name__ == '__main__':
             c = keras.utils.to_categorical(class_target, num_classes=10)
             c = np.broadcast_to(c, (z.shape[0], c.shape[1]))
             ims = np.broadcast_to(image, (z.shape[0], 28, 28, 1))
-
             nll, dnll_dz = get_loss_and_grads([z, c, ims])
             #use linearity of differentiation to get the gradient
             return nll + nlogprior, dnll_dz + d_nlogprior_dz
@@ -131,9 +131,21 @@ if __name__ == '__main__':
 
             lE, _ = obj(samps2) # the (negative) log liklihood + log prior  
             logprobs[c] = - np.log((np.mean(np.exp(qz + lE))))
-        logprob = np.log( np.exp( lps + np.log(0.1) ).mean())
+        logprob = np.log( np.exp( logprobs + np.log(0.1) ).mean())
         return logprob, logprobs
+  
+    mmnist = h5py.File('datasets/manifold_mnist.h5', 'r')
 
+    log_prob = []
+    log_prob_classes = []
+    # define the energy of the posteior
+    for i in range(50):
+        print('image: ',i)
+        image = mmnist['x_train'][i]
+        lp, lps = eval_probabilities(image)
+        log_prob.append(lp)
+        log_prob_classes.append(lps)
+        
     # xx, yy = np.meshgrid(np.linspace(-5,5,100), np.linspace(-5,5,100))
     # X = np.concatenate([xx.reshape(-1,1), yy.reshape(-1,1)], axis=1)
 

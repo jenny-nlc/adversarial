@@ -12,6 +12,9 @@ from train_cdropout_3s_7s import mnist_to_3s_and_7s
 BATCH_SIZE=128
 
 
+def binary_logprob(y, y_):
+    return y * np.log(y) + (1 - y) * np.log(1 - y_)
+
 def define_CVAE(optim='adagrad', latent_dim=2):
     input_x = keras.layers.Input(shape=(28,28,1))
     input_c = keras.layers.Input(shape=(10,)) #one hot class distribution condition
@@ -122,22 +125,21 @@ def create_mmnist(decoder, n_train=60000, n_test = 30000):
     # of course the probability of each point is zero. Imagine it's the probability in a ball of
     # radius machine epsilon or something.
 
-    train_log_prob_d  = np.log(0.1) + stats.norm.logpdf(train_z).sum(axis=1)
 
     mmnist_x_train = decoder.predict([train_z, mmnist_y_train])
-
+                       # prob of class * prob of latent variable * prob of image (in actual fact, this is the mean probability of the randomly binarised output)
+    train_log_prob_d  = np.log(0.1) + stats.norm.logpdf(train_z).sum(axis=1) + binary_logprob(mmnist_x_train, mmnist_x_train).sum(axis=(1,2,3))
 
     mmnist_y_test = keras.utils.to_categorical(
         np.random.randint(0, high=10, size=n_test))    # c ~ Categorical[0..9]
 
     test_z  = np.random.randn(n_test, latent_dim)      # z ~ Normal([0 0 ..] ,eye(D))
 
-    test_log_prob_d  = np.log(0.1) + stats.norm.logpdf(test_z).sum(axis=1) 
-
     mmnist_x_test = decoder.predict([test_z, mmnist_y_test])
 
+    test_log_prob_d  = np.log(0.1) + stats.norm.logpdf(test_z).sum(axis=1) + binary_logprob(mmnist_x_test, mmnist_x_test).sum(axis=(1,2,3))
 
-    with h5py.File('save/manifold_mnist.h5', 'w') as f:
+    with h5py.File('datasets/manifold_mnist.h5', 'w') as f:
         f.create_dataset('x_train', data=mmnist_x_train)
         f.create_dataset('y_train', data=mmnist_y_train)
         f.create_dataset('train_logprob', data=train_log_prob_d)
