@@ -74,70 +74,70 @@ def hmc_sample(x,
             print('iter:',i, 'Energy:', E, 'grad:', jac, 'x:', x)
     return samples, np.array(losses).squeeze().T
 
+_, _, decoder = g_mmnist.define_CVAE()
+#load model
+decoder.load_weights('manifold_mnist/mmnist_dec_weights_latent_dim_2.h5')
+
+def make_objective(image, class_target):
+    # get gradient from keras model
+    z_t, class_t = decoder.inputs
+    prob_t = K.batch_flatten(decoder.outputs[0])
+    image_t = K.placeholder(shape=(None, 28, 28, 1))
+    x_t = K.batch_flatten(image_t)
+
+    negloglik = K.sum(K.binary_crossentropy(x_t, prob_t), axis=-1) # log liklihood of x
+
+    grad = K.gradients([negloglik], [z_t])[0]
+
+    get_loss_and_grads = K.function([z_t, class_t, image_t], [negloglik, grad] )
+
+    def obj(z):
+        # log N(0,1) prior, trivial analytical form
+        nlogprior      = np.log(np.sqrt( 2 * np.pi)) +  .5 * (z ** 2).sum(axis=1)
+        d_nlogprior_dz =  z
+        c = keras.utils.to_categorical(class_target, num_classes=10)
+        c = np.broadcast_to(c, (z.shape[0], c.shape[1]))
+        ims = np.broadcast_to(image, (z.shape[0], 28, 28, 1))
+        nll, dnll_dz = get_loss_and_grads([z, c, ims])
+        #use linearity of differentiation to get the gradient
+        return nll + nlogprior, dnll_dz + d_nlogprior_dz
     
-    
+    return obj
+
+def eval_probabilities(image, n_samps=64, burn_in=20, epsilon=7e-2, tau=80, sample_every=1):
+    logprobs = np.zeros(10)
+
+    for c in range(10):
+        obj = make_objective(image, c)
+        samples, losses = hmc_sample(np.random.randn(1,2),
+                                    obj,
+                                    tau=tau,
+                                    epsilon = epsilon,
+                                    n_samps=n_samps,
+                                    burn_in=burn_in,
+                                    sample_every=sample_every)
+
+
+        n_samps = samples.shape[0]
+        samps1 = samples[:n_samps//2]
+        samps2 = samples[n_samps//2:]
+        density = GaussianMixture(n_components=1)
+        density.fit(samps1)
+
+        # evaluate the estimator of Kingma and Welling
+        qz = density.score_samples(samps2) # log Probability of samples under the density model
+
+        lE, _ = obj(samps2) # the (negative) log liklihood + log prior  
+        logprobs[c] = - np.log((np.mean(np.exp(qz + lE))))
+    logprob = np.log( np.exp( logprobs + np.log(0.1) ).mean())
+    return logprob, logprobs
+
+
 
 
 if __name__ == '__main__':
-    _, _, decoder = g_mmnist.define_CVAE()
-    #load model
-    decoder.load_weights('save/mmnist_dec_weights_latent_dim_2.h5')
-   
-    def make_objective(image, class_target):
-        # get gradient from keras model
-        z_t, class_t = decoder.inputs
-        prob_t = K.batch_flatten(decoder.outputs[0])
-        image_t = K.placeholder(shape=(None, 28, 28, 1))
-        x_t = K.batch_flatten(image_t)
-
-        negloglik = K.sum(K.binary_crossentropy(x_t, prob_t), axis=-1) # log liklihood of x
-
-        grad = K.gradients([negloglik], [z_t])[0]
-
-        get_loss_and_grads = K.function([z_t, class_t, image_t], [negloglik, grad] )
-
-        def obj(z):
-            # log N(0,1) prior, trivial analytical form
-            nlogprior      = np.log(np.sqrt( 2 * np.pi)) +  .5 * (z ** 2).sum(axis=1)
-            d_nlogprior_dz =  z
-            c = keras.utils.to_categorical(class_target, num_classes=10)
-            c = np.broadcast_to(c, (z.shape[0], c.shape[1]))
-            ims = np.broadcast_to(image, (z.shape[0], 28, 28, 1))
-            nll, dnll_dz = get_loss_and_grads([z, c, ims])
-            #use linearity of differentiation to get the gradient
-            return nll + nlogprior, dnll_dz + d_nlogprior_dz
-        
-        return obj
-
-    def eval_probabilities(image, n_samps=64, burn_in=20, epsilon=7e-2, tau=80, sample_every=1):
-        logprobs = np.zeros(10)
-
-        for c in range(10):
-            obj = make_objective(image, c)
-            samples, losses = hmc_sample(np.random.randn(1,2),
-                                        obj,
-                                        tau=tau,
-                                        epsilon = epsilon,
-                                        n_samps=n_samps,
-                                        burn_in=burn_in,
-                                        sample_every=sample_every)
-
-
-            n_samps = samples.shape[0]
-            samps1 = samples[:n_samps//2]
-            samps2 = samples[n_samps//2:]
-            density = GaussianMixture(n_components=1)
-            density.fit(samps1)
-
-            # evaluate the estimator of Kingma and Welling
-            qz = density.score_samples(samps2) # log Probability of samples under the density model
-
-            lE, _ = obj(samps2) # the (negative) log liklihood + log prior  
-            logprobs[c] = - np.log((np.mean(np.exp(qz + lE))))
-        logprob = np.log( np.exp( logprobs + np.log(0.1) ).mean())
-        return logprob, logprobs
-  
-    mmnist = h5py.File('datasets/manifold_mnist.h5', 'r')
+     
+    mmnist = h5py.File('manifold_mnist/manifold_mnist.h5', 'r')
 
     log_prob = []
     log_prob_classes = []
