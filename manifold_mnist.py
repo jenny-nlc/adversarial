@@ -20,25 +20,28 @@ def hmc_sample(x,
                verbose = False
 ):
     
-    #assume x is a 1-d vector for now
+    # work on batches; x is a N by d tensor. 
 
     E, jac = obj(x)  # energy, jacobian
 
-    samples = []
+    samples = np.zeros(x.shape[0], n_samps)
     losses = []
+
     tau_lo = np.int( 0.5 * tau)
     tau_hi = np.int(1.5 * tau)
 
     ep_lo = 0.8 * epsilon
     ep_hi = 1.2 * epsilon
     i = 0
-    while( len(samples) < n_samps):
+    sampind = 0
+    while( sampind < n_samps):
 
         #sample tau and epsilon
         tau = np.random.randint(tau_lo, high=tau_hi)
         ep  = ep_lo + np.random.random() * (ep_hi - ep_lo)
+
         p = np.random.randn(*x.shape)
-        H = 0.5 * p @ p.T + E
+        H = 0.5 * (p **2).sum(axis=1) + E
 
         x_prop = x.copy(); jac_prop = jac.copy();
 
@@ -51,7 +54,7 @@ def hmc_sample(x,
             
             p      = p - 0.5 * ep * jac_prop  # step p again
 
-        H_prop = 0.5 * p @ p.T + E_prop       # Hamiltonian at proposal point
+        H_prop = 0.5 * (p ** 2).sum(axis=1) + E_prop       # Hamiltonian at proposal point
 
         dH = H_prop - H
         # Metropolis Hastings step to correct for the discrete dynamics
@@ -65,11 +68,11 @@ def hmc_sample(x,
         
         losses.append(E)
         if i > burn_in and i % sample_every == 0:
-            samples.append(x)
+            samples[samping] = x.copy()
         i += 1
         if verbose:
             print('iter:',i, 'Energy:', E, 'grad:', jac, 'x:', x)
-    return np.array(samples).squeeze(), np.array(losses).squeeze()
+    return samples, np.array(losses).squeeze().T
 
     
     
