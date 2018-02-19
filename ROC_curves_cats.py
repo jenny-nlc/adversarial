@@ -12,15 +12,19 @@ import src.utilities as U
 from cleverhans import attacks
 from cleverhans.model import CallableModelWrapper
 
-from cats_and_dogs import define_model, H5PATH
+from cats_and_dogs import define_model, H5PATH, define_model_resnet
 """
 This script calculates the ROC for various models for the basic iterative method.
 TODO: use CW attack? but this has a non-straightforward generalisation...
 """
-def load_model(deterministic=False, name = 'save/cats_dogs_vgg_w.h5'):
+def load_model(deterministic=False, name = 'save/cats_dogs_rn50_w_run.h5', resnet = True):
     lp = not deterministic
     K.set_learning_phase(lp)
-    model = define_model()
+    if resnet:
+        model = define_model_resnet()
+    else:
+        model = define_model()
+
     model.load_weights(name)
     model.compile(loss='categorical_crossentropy', optimizer='sgd')
     return model
@@ -70,6 +74,26 @@ def batch_eval(tensor, input_t, x,batch_size=256,verbose=False):
         if verbose:
             print(verbose, 'iteration: ', i)
     return np.concatenate(res, axis=0)
+
+def create_adv_examples(model, input_t, x_to_adv, attack_dict):
+    """
+    This fn may seem bizarre and pointless, but the point of it is to
+    enable the entire attack to be specified as a dict from the command line without
+    editing this script, which is a convenient thing to be able to do, both for
+    scripting and repeatablity
+    """
+    if attack_dict['method'] == 'fgm':
+        attack = attacks.FastGradientMethod(model, sess=K.get_session(), back='tf')
+    elif attack_dict['method'] == 'bim':
+        attack = attacks.BasicIterativeMethod(model,sess=K.get_session(), back='tf')
+    elif attack_dict['method'] == 'mim':
+        attack = attacks.MomentumIterativeMethod(model,sess=K.get_session(), back='tf')
+    else:
+        assert False, 'Current attack needs to be added to the create attack fn' #this hurts a little
+    adv_tensor = attack.generate(input_t, **{k : a for k, a in attack_dict.items() if k != 'method'}) # 'method' key for this fn use
+    x_adv = batch_eval(adv_tensor, input_t, x_to_adv, batch_size=args.batch_size, verbose="Generating adv examples") 
+    return x_adv
+ 
     
 if __name__ == '__main__':
 
@@ -80,8 +104,14 @@ if __name__ == '__main__':
     parser.add_argument('--N_mc', type=int, default=20, help="number of mc passes")
     parser.add_argument('--batch_size', type=int, default=5, help='Batch size to use')
     parser.add_argument('--use_same_examples', action='store_true')
+    parser.add_argument('attack_params', type=json.loads, help='Json of adversarial attack generation method. See cleverhans docs')
+
 
     args = parser.parse_args()
+
+    # imagenet min/max after preprocessing
+    args.attack_params['clip_min'] =-103.939 
+    args.attack_params['clip_max'] = 131.32
 
     SYNTH_DATA_SIZE = args.N_data
 
@@ -159,25 +189,8 @@ if __name__ == '__main__':
         input_t = K.placeholder(shape=(None, 224, 224, 3))
         wrap = CallableModelWrapper(m, 'probs') 
         if (not args.use_same_examples) or i == 0:
-            attack = attacks.BasicIterativeMethod(wrap,
-                    sess=K.get_session(),
-                    back='tf')
-
-            attack_method = 'bim'
-
-            adv_tensor = attack.generate(input_t,
-                    eps = 15,
-                    eps_iter = 3,
-                    nb_iter = 10,
-                    ord=np.inf,
-                    clip_min=-103.939,
-                    clip_max=131.32)
-            x_adv = batch_eval(adv_tensor, input_t, x_to_adv, batch_size=args.batch_size, verbose="Generating adv examples") 
-        
-            attack_params = {p: getattr(attack, p) for p in list(attack.feedable_kwargs.keys())
-                    if hasattr(attack, p) } 
-            attack_params['method'] = attack_method
-            attack_params['use_same'] = args.use_same_examples
+            x_adv = create_adv_examples(wrap, input_t, x_to_adv, args.attack_params)
+            args.attack_params['use_same'] = args.use_same_examples
 
         #check the examples are really adversarial
         preds = np.concatenate([m.predict(x).argmax(axis=1) for x in batch_gen(x_adv, batch_size=args.batch_size)], axis=0)
@@ -291,11 +304,11 @@ if __name__ == '__main__':
         AP_entropies_succ.append(AP_entropy)
         AP_balds_succ.append(AP_bald)
  
-    fname = U.gen_save_name('save/roc_curves_cats_results_fin_run.h5')
+    fname = U.gen_save_name('save/roc_curves_cats_results_rn50_run.h5')
     
     with h5py.File(fname, 'w') as f:
         #record some meta-data in case i forget what i was doing
-        f.create_dataset('attack', data=json.dumps(attack_params))
+        f.create_dataset('attack', data=json.dumps(args.attack_params))
         f.create_dataset('dists', data = np.array(dists_ls))
         f.create_dataset('N_data', data=args.N_data)
         for i,name in enumerate(modelnames):
