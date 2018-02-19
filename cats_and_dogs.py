@@ -93,23 +93,14 @@ def define_model_resnet():
         layer.trainable = False
     return model
 
-def train(X, Y, X_val, Y_val):
-    model = define_model()
-    model.compile(loss='categorical_crossentropy',
-                  metrics=['accuracy'],optimizer='adam')
-
-    #sanity check; just train for now
-    model.fit(X, Y, epochs=10,  validation_data=(X_val, Y_val), shuffle='batch')
-    return model
-
 if __name__ == '__main__':
     mode = 'rnet'
     if mode == 'vgg':
         model = define_model()
-        wname = 'save/cats_dogs_vgg_w_run/h5'
+        wname = 'save/cats_dogs_vgg_w_run.h5'
     elif mode == 'rnet':
         model = define_model_resnet()
-        wname = 'save/cats_dogs_rn50_w_run/h5'
+        wname = 'save/cats_dogs_rn50_w_run.h5'
 
     model.compile(loss='categorical_crossentropy',
                   metrics=['accuracy'],optimizer='adam')
@@ -119,7 +110,7 @@ if __name__ == '__main__':
 
         x_te = f['test']['X']
         y_te = f['test']['Y']
-        model.fit(x_tr, y_tr, epochs=10,  validation_data=(x_te, y_te))
+        model.fit(x_tr, y_tr, epochs=15,  validation_data=(x_te, y_te), shuffle = 'batch')
         name = U.gen_save_name(wname)
         model.save_weights(name)
 
