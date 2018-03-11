@@ -42,24 +42,16 @@ def make_random_targets(y, n_classes=10):
     new = (labels + np.random.randint(1, n_classes - 1) ) % n_classes
     return to_categorical(new, num_classes=n_classes)
 def get_models(n_mc=10):
-
+    models = []
     model = load_model(deterministic=True)
-    yield ('Deterministic Model', model)
+    models.append(('Deterministic Model', model))
 
     model = load_model(deterministic=False)
     input_tensor = model.input
     mc_model = U.MCModel(model, input_tensor, n_mc = n_mc )
-    yield ('MC Model', mc_model)
-    
-    # load a model ensemble 
-#   ms = []
-#   for name in filter(lambda x: 'vgg' in x, os.listdir('save')):
-#       print('loading model {}'.format(name))
-#       model = load_model(deterministic=False, name=('save/' + name))
-#       ms.append(model)
-#   mc_model = U.MCEnsembleWrapper(ms, n_mc=5)
-#   yield ('Ensemble Model', mc_model)
+    models.append(('MC Model', mc_model))
 
+    return models
 def batch_gen(array, batch_size=256):
     N = array.shape[0]
     n_batches = N // batch_size + (N % batch_size != 0)
@@ -267,7 +259,7 @@ def run(x_real,
         AP_entropies_succ.append(AP_entropy)
         AP_balds_succ.append(AP_bald)
  
-    fname = U.gen_save_name(fname.format(attack_params.method))
+    fname = U.gen_save_name(fname.format(attack_params["method"]))
     
     with h5py.File(fname, 'w') as f:
         #record some meta-data in case i forget what i was doing
@@ -348,8 +340,6 @@ if __name__ == '__main__':
     x_real_labels = [0 for _ in range(SYNTH_DATA_SIZE)]
     x_plus_noise_labels = [0 for _ in range(SYNTH_DATA_SIZE)]
     x_adv_labels = [1 for _ in range(SYNTH_DATA_SIZE)]
-    
-
 
     attack_params = [
             {
@@ -403,6 +393,7 @@ if __name__ == '__main__':
                 "ord" : np.inf,
             }]
     for attack_spec in attack_params:
+        print(attack_spec)
         run(x_real,
             x_real_labels,
             x_to_adv,
@@ -413,6 +404,6 @@ if __name__ == '__main__':
             x_advs_plot,
             attack_spec,
             adv_save_num=adv_save_num,
-            fname='roc_curves_{}_',
+            fname='output/roc_curves_{}.h5',
             batch_size=args.batch_size,
             N_data=args.N_data)
