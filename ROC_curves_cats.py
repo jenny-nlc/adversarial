@@ -94,54 +94,19 @@ def create_adv_examples(model, input_t, x_to_adv, attack_dict):
     x_adv = batch_eval(adv_tensor, input_t, x_to_adv, batch_size=args.batch_size, verbose="Generating adv examples") 
     return x_adv
  
-    
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--N_data', type=int, default=100, help="Number of examples \
-        of adverserial and non-adverserial examples to use. If 0 will use the \
-        entire dataset")
-    parser.add_argument('--N_mc', type=int, default=20, help="number of mc passes")
-    parser.add_argument('--batch_size', type=int, default=5, help='Batch size to use')
-    parser.add_argument('--use_same_examples', action='store_true')
-    parser.add_argument('attack_params', type=json.loads, help='Json of adversarial attack generation method. See cleverhans docs')
-
-
-    args = parser.parse_args()
-
-    # imagenet min/max after preprocessing
-    args.attack_params['clip_min'] =-103.939 
-    args.attack_params['clip_max'] = 131.32
-
-    SYNTH_DATA_SIZE = args.N_data
-
-    print('Loading data...')
-    h5database = h5py.File(H5PATH, 'r')
-    x_test = h5database['test']['X'].value
-    y_test = h5database['test']['Y'].value
-    h5database.close()
-
-    # load the pre-trained models 
-    models_to_eval = get_models(n_mc=args.N_mc) 
-
-    # create a synthetic training set at various epsilons, 
-    # and evaluate the ROC curves on it. Combine adversarial and random pertubations
-
-    x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
-    to_adv_inds = np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)
-    x_to_adv = x_test[to_adv_inds]
-    x_to_adv_labs = y_test[to_adv_inds]
-    x_plus_noise = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
-
-    adv_save_num = 15 if x_to_adv.shape[0] >= 15 else x_to_adv.shape[0]
-
-    x_advs_plot = [U.tile_images([x_to_adv[i] for i in range(adv_save_num)], horizontal=False)]
-
-    # label zero for non adverserial input
-    x_real_label = [0 for _ in range(SYNTH_DATA_SIZE)]
-    x_plus_noise_label = [0 for _ in range(SYNTH_DATA_SIZE)]
-    x_adv_label = [1 for _ in range(SYNTH_DATA_SIZE)]
-
+def run(x_real,
+    x_real_labels,
+    x_to_adv,
+    x_to_adv_labels,
+    x_adv_labels,
+    x_plus_noise,
+    x_plus_noise_labels,
+    x_advs_plot,
+    attack_params,
+    adv_save_num=15,
+    fname ='rcc_results_{}',
+    batch_size=5,
+    N_data=200): 
     dists_ls = []
             
     fpr_entropies = []
@@ -188,17 +153,15 @@ if __name__ == '__main__':
 
         input_t = K.placeholder(shape=(None, 224, 224, 3))
         wrap = CallableModelWrapper(m, 'probs') 
-        if (not args.use_same_examples) or i == 0:
-            x_adv = create_adv_examples(wrap, input_t, x_to_adv, args.attack_params)
-            args.attack_params['use_same'] = args.use_same_examples
+        x_adv = create_adv_examples(wrap, input_t, x_to_adv, attack_params)
 
         #check the examples are really adversarial
         preds = np.concatenate([m.predict(x).argmax(axis=1) for x in batch_gen(x_adv, batch_size=args.batch_size)], axis=0)
-        acc = np.mean(np.equal(preds, x_to_adv_labs.argmax(axis=1)))
+        acc = np.mean(np.equal(preds, x_to_adv_labels.argmax(axis=1)))
         print("Accuracy on adv examples:", acc)
         accs.append(acc)
         
-        succ_adv_inds = np.logical_not(np.equal(preds, x_to_adv_labs.argmax(axis=1))) #seperate out succesful adv examples
+        succ_adv_inds = np.logical_not(np.equal(preds, x_to_adv_labels.argmax(axis=1))) #seperate out succesful adv examples
 
         dists = U.batch_L_norm_distances(x_to_adv, x_adv, ord=2)
         noise = np.random.random(size=x_plus_noise.shape)
@@ -206,15 +169,15 @@ if __name__ == '__main__':
         x_plus_noise += noise
         x_plus_noise = np.clip(x_plus_noise, 0, 1)
         x_synth = np.concatenate([x_real, x_adv, x_plus_noise])
-        y_synth = np.array(x_real_label + x_adv_label + x_plus_noise_label)
+        y_synth = np.array(x_real_labels + x_adv_labels + x_plus_noise_labels)
         #x_synth, y_synth = shuffle_dataset(x_synth, y_synth) no points
         dists_ls.append(dists) 
-        succ_adv_inds = np.concatenate([np.ones(len(x_real_label)), succ_adv_inds, np.ones(len(x_plus_noise_label))]).astype(np.bool)
+        succ_adv_inds = np.concatenate([np.ones(len(x_real_labels)), succ_adv_inds, np.ones(len(x_plus_noise_labels))]).astype(np.bool)
         # save the adverserial examples to plot
-        x_advs_plot.append(U.tile_images([x_adv[i] for i in range(adv_save_num)],
-                                    horizontal=False))
+        x_advs_plot= x_advs_plot + U.tile_images([x_adv[i] for i in range(adv_save_num)],
+                                    horizontal=False)
 
-        batches = U.batches_generator(x_synth, y_synth, batch_size=args.batch_size)
+        batches = U.batches_generator(x_synth, y_synth, batch_size=batch_size)
         # get the entropy and bald on this task
         try: 
             #we can now clean up the adv tensor
@@ -304,13 +267,13 @@ if __name__ == '__main__':
         AP_entropies_succ.append(AP_entropy)
         AP_balds_succ.append(AP_bald)
  
-    fname = U.gen_save_name('save/roc_curves_cats_results_rn50_run.h5')
+    fname = U.gen_save_name(fname.format(attack_params.method))
     
     with h5py.File(fname, 'w') as f:
         #record some meta-data in case i forget what i was doing
-        f.create_dataset('attack', data=json.dumps(args.attack_params))
+        f.create_dataset('attack', data=json.dumps(attack_params))
         f.create_dataset('dists', data = np.array(dists_ls))
-        f.create_dataset('N_data', data=args.N_data)
+        f.create_dataset('N_data', data=N_data)
         for i,name in enumerate(modelnames):
             g = f.create_group(name)
             g.create_dataset('entropy_fpr', data=fpr_entropies[i])
@@ -342,4 +305,114 @@ if __name__ == '__main__':
             g.create_dataset('adv_accuracy', data=accs[i])
 
         f.create_dataset('example_imgs', data=np.concatenate(x_advs_plot, axis=1))
+       
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--N_data', type=int, default=100, help="Number of examples \
+        of adverserial and non-adverserial examples to use. If 0 will use the \
+        entire dataset")
+    parser.add_argument('--N_mc', type=int, default=20, help="number of mc passes")
+    parser.add_argument('--batch_size', type=int, default=5, help='Batch size to use')
+
+
+    args = parser.parse_args()
+
+    # imagenet min/max after preprocessing
+
+    SYNTH_DATA_SIZE = args.N_data
+
+    print('Loading data...')
+    h5database = h5py.File(H5PATH, 'r')
+    x_test = h5database['test']['X'].value
+    y_test = h5database['test']['Y'].value
+    h5database.close()
+
+    # load the pre-trained models 
+    models_to_eval = get_models(n_mc=args.N_mc) 
+
+    # create a synthetic training set at various epsilons, 
+    # and evaluate the ROC curves on it. Combine adversarial and random pertubations
+
+    x_real = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+    to_adv_inds = np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)
+    x_to_adv = x_test[to_adv_inds]
+    x_to_adv_labels = y_test[to_adv_inds]
+    x_plus_noise = x_test[np.random.randint(x_test.shape[0], size=SYNTH_DATA_SIZE)]
+
+    adv_save_num = 15 if x_to_adv.shape[0] >= 15 else x_to_adv.shape[0]
+
+    x_advs_plot = [U.tile_images([x_to_adv[i] for i in range(adv_save_num)], horizontal=False)]
+
+    # label zero for non adverserial input
+    x_real_labels = [0 for _ in range(SYNTH_DATA_SIZE)]
+    x_plus_noise_labels = [0 for _ in range(SYNTH_DATA_SIZE)]
+    x_adv_labels = [1 for _ in range(SYNTH_DATA_SIZE)]
     
+
+
+    attack_params = [
+            {
+                "method": "fgm",
+                "eps": 5,
+                "clip_min": -103.939,
+                "clip_max": 131.32,
+                "ord" : np.inf,
+            },
+            {
+                "method": "fgm",
+                "eps": 10,
+                "clip_min": -103.939,
+                "clip_max": 131.32,
+                "ord" : np.inf,
+            },
+            {
+                "method": "bim",
+                "eps": 5,
+                "eps_iter": 0.8,
+                "clip_min": -103.939,
+                "clip_max":  131.32,
+                "ord" : np.inf,
+                "nb_iter" : 10,
+                "eps_iter": 0.5
+            },
+            {
+                "method": "bim",
+                "eps": 10,
+                "eps_iter": 1.2,
+                "clip_min" :-103.939,
+                "clip_max" : 131.32,
+                "ord" : np.inf,
+            },
+            {
+                "method": "mim",
+                "eps": 5,
+                "eps_iter": 0.8,
+                "clip_min" :-103.939,
+                "clip_max" : 131.32,
+                "ord" : np.inf,
+                "nb_iter" : 10,
+                "eps_iter": 0.5
+            },
+            {
+                "method": "mim",
+                "eps": 10,
+                "eps_iter": 1.2,
+                "clip_min" :-103.939,
+                "clip_max" : 131.32,
+                "ord" : np.inf,
+            }]
+    for attack_spec in attack_params:
+        run(x_real,
+            x_real_labels,
+            x_to_adv,
+            x_to_adv_labels,
+            x_adv_labels,
+            x_plus_noise,
+            x_plus_noise_labels,
+            x_advs_plot,
+            attack_spec,
+            adv_save_num=adv_save_num,
+            fname='roc_curves_{}_',
+            batch_size=args.batch_size,
+            N_data=args.N_data)
