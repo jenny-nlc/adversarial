@@ -7,6 +7,7 @@ import src.utilities as U
 import os
 import h5py
 from keras import backend as K
+from src.concrete_dropout import ConcreteDropout
 
 H5PATH='/data-local/lsgs/cats_dogs.h5'
 
@@ -92,15 +93,29 @@ def define_model_resnet():
     for layer in rn50.layers:
         layer.trainable = False
     return model
+def define_cdropout_model_resnet():
+    K.set_learning_phase(True)
+    rn50 = ResNet50(weights = 'imagenet', include_top='False')
+    a = ConcreteDropout(Dense(2, activation='softmax'))(rn50.output)
+    
+    model = keras.models.Model(inputs = rn50.input, outputs = a)
+    
+    #freeze resnet layers
+    for layer in rn50.layers:
+        layer.trainable = False
+    return model
 
 if __name__ == '__main__':
-    mode = 'rnet'
+    mode = 'rnet_cdrop'
     if mode == 'vgg':
         model = define_model()
         wname = 'save/cats_dogs_vgg_w_run.h5'
     elif mode == 'rnet':
         model = define_model_resnet()
         wname = 'save/cats_dogs_rn50_w_run.h5'
+    elif mode == 'rnet_cdrop':
+        model = define_cdropout_model_resnet()
+        wname = 'save/cats_dogs_rn50_cdrop_w_run.h5'
 
     model.compile(loss='categorical_crossentropy',
                   metrics=['accuracy'],optimizer='adam')
@@ -110,7 +125,7 @@ if __name__ == '__main__':
 
         x_te = f['test']['X']
         y_te = f['test']['Y']
-        model.fit(x_tr, y_tr, epochs=15,  validation_data=(x_te, y_te), shuffle = 'batch')
+        model.fit(x_tr, y_tr, epochs=40,  validation_data=(x_te, y_te), shuffle = 'batch')
         name = U.gen_save_name(wname)
         model.save_weights(name)
 
