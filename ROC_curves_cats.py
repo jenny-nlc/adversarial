@@ -166,8 +166,7 @@ def run(x_real,
         dists_ls.append(dists) 
         succ_adv_inds = np.concatenate([np.ones(len(x_real_labels)), succ_adv_inds, np.ones(len(x_plus_noise_labels))]).astype(np.bool)
         # save the adverserial examples to plot
-        x_advs_plot= x_advs_plot + U.tile_images([x_adv[i] for i in range(adv_save_num)],
-                                    horizontal=False)
+        x_advs_plot= x_advs_plot + [U.tile_images([x_adv[i] for i in range(adv_save_num)], horizontal=False)]
 
         batches = U.batches_generator(x_synth, y_synth, batch_size=batch_size)
         # get the entropy and bald on this task
